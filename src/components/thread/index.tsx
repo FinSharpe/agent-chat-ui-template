@@ -12,7 +12,6 @@ import {
   DO_NOT_RENDER_ID_PREFIX,
   ensureToolCallsHaveResponses,
 } from "@/lib/ensure-tool-responses";
-import { LangGraphLogoSVG } from "../icons/langgraph";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import {
   ArrowDown,
@@ -45,6 +44,9 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import { useLocalStorageState } from "@/hooks/useLocalStorageState";
+import { PlannerModels } from "@/configs/models";
+import { ModelSwitcher } from "./ModelSwitcher";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -93,7 +95,7 @@ function OpenGitHubRepo() {
       <Tooltip>
         <TooltipTrigger asChild>
           <a
-            href="https://github.com/langchain-ai/agent-chat-ui"
+            href={process.env.NEXT_PUBLIC_GITHUB_REPO_URL}
             target="_blank"
             className="flex items-center justify-center"
           >
@@ -137,6 +139,13 @@ export function Thread() {
   } = useFileUpload();
   const [firstTokenReceived, setFirstTokenReceived] = useState(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
+  const [selectedModel, setSelectedModel] = useLocalStorageState<PlannerModels>(
+    "lg:chat:selectedModel",
+    PlannerModels.GEMINI_FLASH,
+    (value): value is PlannerModels =>
+      typeof value === "string" &&
+      (Object.values(PlannerModels) as string[]).includes(value),
+  );
 
   const stream = useStreamContext();
   const messages = stream.messages;
@@ -220,6 +229,11 @@ export function Thread() {
         streamMode: ["values"],
         streamSubgraphs: true,
         streamResumable: true,
+        config: {
+          configurable: {
+            tradekit_agent_model: selectedModel,
+          },
+        },
         optimisticValues: (prev) => ({
           ...prev,
           context,
@@ -247,6 +261,11 @@ export function Thread() {
       streamMode: ["values"],
       streamSubgraphs: true,
       streamResumable: true,
+      config: {
+        configurable: {
+          tradekit_agent_model: selectedModel,
+        },
+      },
     });
   };
 
@@ -325,7 +344,11 @@ export function Thread() {
                   </Button>
                 )}
               </div>
-              <div className="absolute top-2 right-4 flex items-center">
+              <div className="absolute top-2 right-4 flex items-center gap-4">
+                <ModelSwitcher
+                  value={selectedModel}
+                  onValueChange={setSelectedModel}
+                />
                 <OpenGitHubRepo />
               </div>
             </div>
@@ -360,10 +383,6 @@ export function Thread() {
                     damping: 30,
                   }}
                 >
-                  <LangGraphLogoSVG
-                    width={32}
-                    height={32}
-                  />
                   <span className="text-xl font-semibold tracking-tight">
                     Agent Chat
                   </span>
@@ -371,6 +390,10 @@ export function Thread() {
               </div>
 
               <div className="flex items-center gap-4">
+                <ModelSwitcher
+                  value={selectedModel}
+                  onValueChange={setSelectedModel}
+                />
                 <div className="flex items-center">
                   <OpenGitHubRepo />
                 </div>
@@ -436,7 +459,6 @@ export function Thread() {
                 <div className="sticky bottom-0 flex flex-col items-center gap-8 bg-white">
                   {!chatStarted && (
                     <div className="flex items-center gap-3">
-                      <LangGraphLogoSVG className="h-8 flex-shrink-0" />
                       <h1 className="text-2xl font-semibold tracking-tight">
                         Agent Chat
                       </h1>
@@ -484,7 +506,7 @@ export function Thread() {
                       />
 
                       <div className="flex items-center gap-6 p-2 pt-4">
-                        <div>
+                        {/* <div>
                           <div className="flex items-center space-x-2">
                             <Switch
                               id="render-tool-calls"
@@ -498,7 +520,7 @@ export function Thread() {
                               Hide Tool Calls
                             </Label>
                           </div>
-                        </div>
+                        </div> */}
                         <Label
                           htmlFor="file-input"
                           className="flex cursor-pointer items-center gap-2"

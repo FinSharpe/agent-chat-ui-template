@@ -1,0 +1,15 @@
+export enum PlannerModels {
+  GPT_5_4 = "openai:gpt-5.4",
+  GPT_5_4_MINI = "openai:gpt-5.4-mini",
+  GPT_5_4_NANO = "openai:gpt-5.4-nano",
+  GPT_5_2 = "openai:gpt-5.2",
+  GPT_5_1 = "openai:gpt-5.1",
+  GPT_5 = "openai:gpt-5",
+  GEMINI_3 = "google_genai:gemini-3-pro-preview",
+  GEMINI_FLASH = "google_genai:gemini-3-flash-preview",
+  GEMINI_2_5_PRO = "google_genai:gemini-2.5-pro",
+  GEMINI_2_5_FLASH = "google_genai:gemini-2.5-flash",
+  SONNET_4_5 = "anthropic:claude-sonnet-4-5-20250929",
+  SONNET_4_6 = "anthropic:claude-sonnet-4-6",
+  HAIKU_4_5 = "anthropic:claude-haiku-4-5-20251001",
+}
