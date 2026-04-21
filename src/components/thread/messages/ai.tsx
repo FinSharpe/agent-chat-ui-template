@@ -1,6 +1,11 @@
 import { parsePartialJson } from "@langchain/core/output_parsers";
 import { useStreamContext } from "@/providers/Stream";
-import { AIMessage, Checkpoint, Message } from "@langchain/langgraph-sdk";
+import {
+  AIMessage,
+  Checkpoint,
+  Message,
+  ToolMessage,
+} from "@langchain/langgraph-sdk";
 import { getContentString } from "../utils";
 import { BranchSwitcher, CommandBar } from "./shared";
 import { MarkdownText } from "../markdown-text";
@@ -9,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { ToolCalls, ToolResult } from "./tool-calls";
 import { MessageContentComplex } from "@langchain/core/messages";
 import { Fragment } from "react/jsx-runtime";
+import { useMemo } from "react";
 import { isAgentInboxInterruptSchema } from "@/lib/agent-inbox-interrupt";
 import { ThreadView } from "../agent-inbox";
 import { useQueryState, parseAsBoolean } from "nuqs";
@@ -128,6 +134,16 @@ export function AssistantMessage({
     ? parseAnthropicStreamedToolCalls(content)
     : undefined;
 
+  const toolResponses = useMemo(() => {
+    const map = new Map<string, ToolMessage>();
+    for (const m of thread.messages) {
+      if (m.type === "tool" && m.tool_call_id) {
+        map.set(m.tool_call_id, m);
+      }
+    }
+    return map;
+  }, [thread.messages]);
+
   const hasToolCalls =
     message &&
     "tool_calls" in message &&
@@ -168,13 +184,22 @@ export function AssistantMessage({
             {!hideToolCalls && (
               <>
                 {(hasToolCalls && toolCallsHaveContents && (
-                  <ToolCalls toolCalls={message.tool_calls} />
+                  <ToolCalls
+                    toolCalls={message.tool_calls}
+                    responses={toolResponses}
+                  />
                 )) ||
                   (hasAnthropicToolCalls && (
-                    <ToolCalls toolCalls={anthropicStreamedToolCalls} />
+                    <ToolCalls
+                      toolCalls={anthropicStreamedToolCalls}
+                      responses={toolResponses}
+                    />
                   )) ||
                   (hasToolCalls && (
-                    <ToolCalls toolCalls={message.tool_calls} />
+                    <ToolCalls
+                      toolCalls={message.tool_calls}
+                      responses={toolResponses}
+                    />
                   ))}
               </>
             )}

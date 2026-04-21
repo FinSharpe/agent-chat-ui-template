@@ -190,10 +190,12 @@ export function CommandBar({
 
   return (
     <div className="flex items-center gap-2">
-      <ContentCopyable
-        content={content}
-        disabled={isLoading}
-      />
+      {content.length > 0 && (
+        <ContentCopyable
+          content={content}
+          disabled={isLoading}
+        />
+      )}
       {isAiMessage && !!handleRegenerate && (
         <TooltipIconButton
           disabled={isLoading}

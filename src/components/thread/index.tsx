@@ -274,6 +274,19 @@ export function Thread() {
     (m) => m.type === "ai" || m.type === "tool",
   );
 
+  const absorbedToolMessageIds = new Set<string>();
+  for (const m of messages) {
+    if (m.type === "ai" && "tool_calls" in m && Array.isArray(m.tool_calls)) {
+      for (const tc of m.tool_calls) {
+        if (!tc.id) continue;
+        const resp = messages.find(
+          (r) => r.type === "tool" && r.tool_call_id === tc.id,
+        );
+        if (resp?.id) absorbedToolMessageIds.add(resp.id);
+      }
+    }
+  }
+
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <div className="relative hidden lg:flex">
@@ -424,6 +437,14 @@ export function Thread() {
                 <>
                   {messages
                     .filter((m) => !m.id?.startsWith(DO_NOT_RENDER_ID_PREFIX))
+                    .filter(
+                      (m) =>
+                        !(
+                          m.type === "tool" &&
+                          m.id &&
+                          absorbedToolMessageIds.has(m.id)
+                        ),
+                    )
                     .map((message, index) =>
                       message.type === "human" ? (
                         <HumanMessage
