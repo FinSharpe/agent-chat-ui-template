@@ -26,7 +26,11 @@ import { useThreads } from "./Thread";
 import { toast } from "sonner";
 import { PlannerModels } from "@/configs/models";
 
-export type StateType = { messages: Message[]; ui?: UIMessage[] };
+export type StateType = {
+  messages: Message[];
+  ui?: UIMessage[];
+  next_prompt_suggestions?: string[];
+};
 
 const useTypedStream = useStream<
   StateType,
