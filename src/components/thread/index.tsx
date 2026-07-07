@@ -150,6 +150,7 @@ export function Thread() {
   const stream = useStreamContext();
   const messages = stream.messages;
   const isLoading = stream.isLoading;
+  const nextPromptSuggestions = stream.values?.next_prompt_suggestions ?? [];
 
   const lastError = useRef<string | undefined>(undefined);
 
@@ -248,6 +249,45 @@ export function Thread() {
 
     setInput("");
     setContentBlocks([]);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    if (isLoading || !suggestion.trim()) return;
+    setFirstTokenReceived(false);
+
+    const newHumanMessage: Message = {
+      id: uuidv4(),
+      type: "human",
+      content: [{ type: "text", text: suggestion }] as Message["content"],
+    };
+
+    const toolMessages = ensureToolCallsHaveResponses(stream.messages);
+    const context =
+      Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
+
+    stream.submit(
+      { messages: [...toolMessages, newHumanMessage], context },
+      {
+        streamMode: ["values"],
+        streamSubgraphs: true,
+        streamResumable: true,
+        config: {
+          configurable: {
+            tradekit_agent_model: selectedModel,
+          },
+        },
+        optimisticValues: (prev) => ({
+          ...prev,
+          context,
+          next_prompt_suggestions: [],
+          messages: [
+            ...(prev.messages ?? []),
+            ...toolMessages,
+            newHumanMessage,
+          ],
+        }),
+      },
+    );
   };
 
   const handleRegenerate = (
@@ -474,6 +514,23 @@ export function Thread() {
                   {isLoading && !firstTokenReceived && (
                     <AssistantMessageLoading />
                   )}
+                  {!isLoading &&
+                    nextPromptSuggestions.length > 0 &&
+                    messages.length > 0 &&
+                    messages[messages.length - 1].type === "ai" && (
+                      <div className="mr-auto flex w-full flex-wrap gap-2 pt-1">
+                        {nextPromptSuggestions.map((suggestion, idx) => (
+                          <button
+                            key={`${idx}-${suggestion}`}
+                            type="button"
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="bg-muted hover:bg-muted/70 cursor-pointer rounded-full border px-3 py-1.5 text-left text-sm transition-colors"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                 </>
               }
               footer={
