@@ -141,7 +141,7 @@ export function Thread() {
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
   const [selectedModel, setSelectedModel] = useLocalStorageState<PlannerModels>(
     "lg:chat:selectedModel",
-    PlannerModels.GEMINI_FLASH,
+    PlannerModels.DEEPSEEK_PRO,
     (value): value is PlannerModels =>
       typeof value === "string" &&
       (Object.values(PlannerModels) as string[]).includes(value),

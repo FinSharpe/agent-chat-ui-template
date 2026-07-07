@@ -35,6 +35,8 @@ describe("<ModelSwitcher />", () => {
 
     expect(optionLabels).toEqual(
       expect.arrayContaining([
+        "Deepseek Pro",
+        "Deepseek Flash",
         "Gpt 5.4",
         "Gpt 5.4 Mini",
         "Gpt 5.4 Nano",

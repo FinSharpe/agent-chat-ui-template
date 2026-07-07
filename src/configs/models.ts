@@ -1,4 +1,6 @@
 export enum PlannerModels {
+  DEEPSEEK_PRO = "deepseek:deepseek-v4-pro",
+  DEEPSEEK_FLASH = "deepseek:deepseek-v4-flash",
   GPT_5_4 = "openai:gpt-5.4",
   GPT_5_4_MINI = "openai:gpt-5.4-mini",
   GPT_5_4_NANO = "openai:gpt-5.4-nano",
