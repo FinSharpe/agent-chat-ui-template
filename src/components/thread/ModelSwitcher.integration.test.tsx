@@ -82,7 +82,9 @@ describe("ModelSwitcher integration", () => {
     // switch model and submit again
     await user.click(screen.getByRole("combobox", { name: /select model/i }));
     const listbox = await screen.findByRole("listbox");
-    await user.click(within(listbox).getByRole("option", { name: "Haiku 4.5" }));
+    await user.click(
+      within(listbox).getByRole("option", { name: "Haiku 4.5" }),
+    );
 
     await user.click(screen.getByRole("button", { name: /submit/i }));
     expect(submit).toHaveBeenLastCalledWith({
@@ -91,7 +93,10 @@ describe("ModelSwitcher integration", () => {
   });
 
   it("ignores a corrupted localStorage value and falls back to the default", () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify("not-a-real-model"));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify("not-a-real-model"),
+    );
 
     render(<Harness submit={() => {}} />);
 

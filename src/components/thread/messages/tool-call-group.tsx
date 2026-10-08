@@ -1,10 +1,5 @@
 import { useState } from "react";
-import {
-  ChevronRight,
-  CheckCircle2,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
+import { ChevronRight, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AIMessage, ToolMessage } from "@langchain/langgraph-sdk";
 import { cn } from "@/lib/utils";
@@ -27,7 +22,10 @@ function parseResponseContent(content: ToolMessage["content"]): {
   }
   try {
     const parsed = JSON.parse(content);
-    if (Array.isArray(parsed) || (typeof parsed === "object" && parsed !== null)) {
+    if (
+      Array.isArray(parsed) ||
+      (typeof parsed === "object" && parsed !== null)
+    ) {
       return { structured: parsed, text: content };
     }
   } catch {
@@ -49,7 +47,7 @@ function TextFallback({ text }: { text: string }) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-      <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-sm text-gray-800">
+      <pre className="max-h-[60vh] overflow-auto p-3 font-mono text-sm break-words whitespace-pre-wrap text-gray-800">
         {display}
       </pre>
       {tooLong && (
@@ -128,7 +126,7 @@ export function ToolCallGroup({ toolCall, response }: ToolCallGroupProps) {
           >
             <div className="flex max-h-[45vh] flex-col gap-3 overflow-auto p-3">
               <section>
-                <h4 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                <h4 className="mb-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                   Arguments
                 </h4>
                 {hasArgs ? (
@@ -146,7 +144,7 @@ export function ToolCallGroup({ toolCall, response }: ToolCallGroupProps) {
 
               {response && parsed && (
                 <section>
-                  <h4 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <h4 className="mb-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Response
                   </h4>
                   {parsed.structured !== null ? (

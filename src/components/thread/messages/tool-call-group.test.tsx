@@ -96,9 +96,7 @@ describe("<ToolCallGroup />", () => {
     );
     await user.click(screen.getByRole("button", { name: /expand/i }));
 
-    expect(
-      screen.getByText(/just a plain error message/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/just a plain error message/)).toBeInTheDocument();
   });
 
   it("does not render a Response section while the tool is still running", async () => {

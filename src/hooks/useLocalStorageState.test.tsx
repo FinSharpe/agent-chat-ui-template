@@ -79,9 +79,7 @@ describe("useLocalStorageState", () => {
   });
 
   it("supports functional setter updates", () => {
-    const { result } = renderHook(() =>
-      useLocalStorageState<number>(KEY, 0),
-    );
+    const { result } = renderHook(() => useLocalStorageState<number>(KEY, 0));
 
     act(() => {
       result.current[1]((prev) => prev + 1);

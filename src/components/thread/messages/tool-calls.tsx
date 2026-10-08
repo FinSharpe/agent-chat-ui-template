@@ -90,7 +90,7 @@ export function ToolResult({ message }: { message: ToolMessage }) {
             />
           ) : (
             <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-              <pre className="max-h-[60vh] overflow-auto break-words p-3 font-mono text-sm whitespace-pre-wrap text-gray-800">
+              <pre className="max-h-[60vh] overflow-auto p-3 font-mono text-sm break-words whitespace-pre-wrap text-gray-800">
                 {displayText}
               </pre>
               {tooLong && (
