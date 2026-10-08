@@ -67,7 +67,9 @@ describe("<ModelSwitcher />", () => {
 
     await user.click(screen.getByRole("combobox", { name: /select model/i }));
     const listbox = await screen.findByRole("listbox");
-    await user.click(within(listbox).getByRole("option", { name: "Sonnet 4.6" }));
+    await user.click(
+      within(listbox).getByRole("option", { name: "Sonnet 4.6" }),
+    );
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
     expect(onValueChange).toHaveBeenCalledWith(PlannerModels.SONNET_4_6);

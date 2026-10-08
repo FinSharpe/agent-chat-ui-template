@@ -132,16 +132,13 @@ function JsonNode({
   const [expanded, setExpanded] = useState(depth < defaultExpandDepth);
 
   const isContainerValue = isContainer(value);
-  const isCircular =
-    isContainerValue && ancestors.includes(value as object);
+  const isCircular = isContainerValue && ancestors.includes(value as object);
 
   if (isCircular) {
     return (
       <LeafLine
         keyLabel={keyLabel}
-        valueNode={
-          <span className="text-gray-400 italic">[Circular]</span>
-        }
+        valueNode={<span className="text-gray-400 italic">[Circular]</span>}
         isLast={isLast}
       />
     );
