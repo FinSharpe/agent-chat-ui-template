@@ -1,5 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { McpAppReport } from "./mcp-app";
 
 vi.mock("next-themes", () => ({
@@ -12,6 +18,7 @@ const app = {
 };
 
 describe("inline report host", () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
@@ -72,5 +79,29 @@ describe("inline report host", () => {
     );
     await waitFor(() => expect(frame.style.height).toBe("412px"));
     expect(screen.queryByText("Opening report…")).not.toBeInTheDocument();
+  });
+
+  it("accepts silent loaded reports while timing out a later unresponsive document", async () => {
+    const { rerender } = render(<McpAppReport app={app} />);
+    await screen.findByTitle("Stock report");
+    vi.useFakeTimers();
+    rerender(<McpAppReport app={{ ...app, html: "<p>Static report</p>" }} />);
+    fireEvent.load(screen.getByTitle("Stock report"));
+    act(() => vi.advanceTimersByTime(16000));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Opening report…")).not.toBeInTheDocument();
+
+    rerender(
+      <McpAppReport app={{ ...app, html: "<p>Unresponsive report</p>" }} />,
+    );
+    act(() => vi.advanceTimersByTime(16000));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The report did not open",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reload report" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.load(screen.getByTitle("Stock report"));
+    act(() => vi.advanceTimersByTime(16000));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

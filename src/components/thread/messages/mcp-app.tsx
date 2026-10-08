@@ -145,7 +145,13 @@ export function McpAppReport({ app }: { app: McpApp }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridge = useRef<BridgeState>({ resultSent: false });
   const [height, setHeight] = useState(260);
-  const [ready, setReady] = useState(false);
+  const loadedDocument = useRef<
+    { document: string; generation: string } | undefined
+  >(undefined);
+  const [readyDocument, setReadyDocument] = useState<{
+    document: string;
+    generation: string;
+  }>();
   const [failed, setFailed] = useState(false);
   const [generation, setGeneration] = useState(0);
   const [fontCss, setFontCss] = useState<string>();
@@ -185,7 +191,7 @@ export function McpAppReport({ app }: { app: McpApp }) {
       if (result.reply)
         iframeRef.current?.contentWindow?.postMessage(result.reply, "*");
       if (result.ready) {
-        setReady(true);
+        setReadyDocument({ document, generation: documentGeneration ?? "0" });
         setFailed(false);
       }
       if (result.height) setHeight(result.height);
@@ -207,15 +213,22 @@ export function McpAppReport({ app }: { app: McpApp }) {
   useEffect(() => {
     if (html === undefined) return;
     const timer = setTimeout(() => {
+      const loaded = loadedDocument.current;
+      const bridgeReady =
+        bridge.current.resultSent &&
+        bridge.current.document === html &&
+        bridge.current.generation === String(generation);
       if (
-        !bridge.current.resultSent ||
-        bridge.current.document !== html ||
-        bridge.current.generation !== String(generation)
+        !bridgeReady &&
+        !(loaded?.document === html && loaded.generation === String(generation))
       )
         setFailed(true);
     }, 15000);
     return () => clearTimeout(timer);
   }, [generation, html]);
+  const ready =
+    readyDocument?.document === html &&
+    readyDocument?.generation === String(generation);
   const title = app.title || toolNoun(app.toolName || "Report");
   return (
     <section
@@ -231,7 +244,7 @@ export function McpAppReport({ app }: { app: McpApp }) {
             className="text-primary underline underline-offset-2"
             onClick={() => {
               setFailed(false);
-              setReady(false);
+              setReadyDocument(undefined);
               setGeneration((value) => value + 1);
             }}
           >
@@ -254,6 +267,14 @@ export function McpAppReport({ app }: { app: McpApp }) {
           ref={iframeRef}
           title={title}
           srcDoc={html}
+          onLoad={(event) => {
+            const document = event.currentTarget.srcdoc;
+            if (document !== html) return;
+            const loaded = { document, generation: String(generation) };
+            loadedDocument.current = loaded;
+            setReadyDocument(loaded);
+            setFailed(false);
+          }}
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
           className="block w-full border-0"

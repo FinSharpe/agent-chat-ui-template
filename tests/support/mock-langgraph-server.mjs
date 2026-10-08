@@ -429,7 +429,7 @@ const server = createServer(async (request, response) => {
   );
   response.setHeader(
     "Access-Control-Allow-Headers",
-    "content-type,x-api-key,x-auth-scheme,last-event-id",
+    "content-type,authorization,x-api-key,x-auth-scheme,last-event-id",
   );
   response.setHeader(
     "Access-Control-Expose-Headers",
