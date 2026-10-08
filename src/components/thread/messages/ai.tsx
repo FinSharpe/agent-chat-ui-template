@@ -6,6 +6,7 @@ import {
   Message,
   ToolMessage,
 } from "@langchain/langgraph-sdk";
+import { useStream } from "@langchain/langgraph-sdk/react";
 import { getContentString } from "../utils";
 import { BranchSwitcher, CommandBar } from "./shared";
 import { MarkdownText } from "../markdown-text";
@@ -40,7 +41,7 @@ function CustomComponent({
       {customComponents.map((customComponent) => (
         <LoadExternalComponent
           key={customComponent.id}
-          stream={thread}
+          stream={thread as unknown as ReturnType<typeof useStream>}
           message={customComponent}
           meta={{ ui: customComponent, artifact }}
         />

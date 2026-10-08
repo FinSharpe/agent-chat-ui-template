@@ -21,7 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ArrowRight } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
-import { getApiKey } from "@/lib/api-key";
+import { getApiKey, setApiKey as storeApiKey } from "@/lib/api-key";
+import { resolveApiUrl } from "@/lib/resolve-api-url";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
 import { PlannerModels } from "@/configs/models";
@@ -47,7 +48,9 @@ const useTypedStream = useStream<
   }
 >;
 
-type StreamContextType = ReturnType<typeof useTypedStream>;
+type StreamContextType = ReturnType<typeof useTypedStream> & {
+  apiUrl: string;
+};
 const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
 async function sleep(ms = 4000) {
@@ -136,7 +139,7 @@ const StreamSession = ({
   }, [apiKey, apiUrl, authScheme]);
 
   return (
-    <StreamContext.Provider value={streamValue}>
+    <StreamContext.Provider value={{ ...streamValue, apiUrl }}>
       {children}
     </StreamContext.Provider>
   );
@@ -172,21 +175,12 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
       AGENT_BUILDER_AUTH_SCHEME,
   );
 
-  // For API key, use localStorage with env var fallback
-  const [apiKey, _setApiKey] = useState(() => {
-    const storedKey = getApiKey();
-    return storedKey || "";
-  });
-
-  const setApiKey = (key: string) => {
-    window.localStorage.setItem("lg:chat:apiKey", key);
-    _setApiKey(key);
-  };
-
-  // Determine final values to use, prioritizing URL params then env vars
-  const finalApiUrl = apiUrl || envApiUrl;
+  const finalApiUrl = resolveApiUrl(apiUrl, envApiUrl);
   const finalAssistantId = assistantId || envAssistantId;
   const finalAuthScheme = authScheme || envAuthScheme || "";
+
+  // Read on each render so saving a key for the same URL takes effect immediately.
+  const apiKey = getApiKey(finalApiUrl) || "";
 
   // Show the form if we: don't have an API URL, or don't have an assistant ID
   if (!finalApiUrl || !finalAssistantId) {
@@ -215,7 +209,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
               const apiKey = formData.get("apiKey") as string;
 
               setApiUrl(apiUrl);
-              setApiKey(apiKey);
+              storeApiKey(resolveApiUrl(apiUrl, envApiUrl), apiKey);
               setAssistantId(assistantId);
               setAuthScheme(isAgentBuilder ? AGENT_BUILDER_AUTH_SCHEME : "");
 
@@ -235,7 +229,8 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
                 id="apiUrl"
                 name="apiUrl"
                 className="bg-background"
-                defaultValue={apiUrl || DEFAULT_API_URL}
+                defaultValue={finalApiUrl || DEFAULT_API_URL}
+                readOnly={Boolean(envApiUrl)}
                 required
               />
             </div>
