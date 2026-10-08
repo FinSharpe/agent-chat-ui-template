@@ -85,13 +85,14 @@ export function BranchSwitcher({
       <Button
         variant="ghost"
         size="icon"
-        className="size-6 p-1"
+        className="size-8 rounded-full p-1 max-sm:min-h-11 max-sm:min-w-11"
+        aria-label="Previous branch"
         onClick={() => {
           const prevBranch = branchOptions[index - 1];
           if (!prevBranch) return;
           onSelect(prevBranch);
         }}
-        disabled={isLoading}
+        disabled={isLoading || index <= 0}
       >
         <ChevronLeft />
       </Button>
@@ -101,13 +102,14 @@ export function BranchSwitcher({
       <Button
         variant="ghost"
         size="icon"
-        className="size-6 p-1"
+        className="size-8 rounded-full p-1 max-sm:min-h-11 max-sm:min-w-11"
+        aria-label="Next branch"
         onClick={() => {
           const nextBranch = branchOptions[index + 1];
           if (!nextBranch) return;
           onSelect(nextBranch);
         }}
-        disabled={isLoading}
+        disabled={isLoading || index >= branchOptions.length - 1}
       >
         <ChevronRight />
       </Button>
@@ -199,7 +201,7 @@ export function CommandBar({
       {isAiMessage && !!handleRegenerate && (
         <TooltipIconButton
           disabled={isLoading}
-          tooltip="Refresh"
+          tooltip="Run again"
           variant="ghost"
           onClick={handleRegenerate}
         >

@@ -9,7 +9,16 @@ import React from "react";
 
 export default function DemoPage(): React.ReactNode {
   return (
-    <React.Suspense fallback={<div>Loading (layout)...</div>}>
+    <React.Suspense
+      fallback={
+        <div
+          className="text-muted-foreground flex h-dvh items-center justify-center text-sm"
+          role="status"
+        >
+          Loading conversation…
+        </div>
+      }
+    >
       <Toaster />
       <ThreadProvider>
         <StreamProvider>

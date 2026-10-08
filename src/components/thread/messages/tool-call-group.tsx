@@ -1,167 +1,155 @@
-import { useState } from "react";
-import { ChevronRight, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef } from "react";
 import { AIMessage, ToolMessage } from "@langchain/langgraph-sdk";
 import { cn } from "@/lib/utils";
 import { JsonViewer } from "./json-viewer";
 import { formatToolName } from "./tool-labels";
+import { useDisclosureOffsets, useDisclosureState } from "./disclosure-state";
 
+export type ToolPhase =
+  "running" | "reconnecting" | "stopped" | "failed" | "settled";
 type ToolCall = NonNullable<AIMessage["tool_calls"]>[number];
 
-interface ToolCallGroupProps {
+export function parseToolPayload(content: unknown): {
+  json: boolean;
+  value: unknown;
+} {
+  if (typeof content !== "string") return { json: true, value: content };
+  try {
+    return { json: true, value: JSON.parse(content) };
+  } catch {
+    return { json: false, value: content };
+  }
+}
+
+export function ToolPayload({
+  value,
+  persistKey,
+  label,
+}: {
+  value: unknown;
+  persistKey?: string;
+  label: string;
+}) {
+  const parsed = parseToolPayload(value);
+  return parsed.json ? (
+    <JsonViewer
+      value={parsed.value}
+      persistKey={persistKey}
+      defaultExpandDepth={1}
+      maxHeight="none"
+      copyLabel={`Copy ${label.toLowerCase()}`}
+    />
+  ) : (
+    <pre className="bg-muted/40 text-foreground rounded-md border p-2.5 font-mono text-[11px] leading-[1.5] break-words whitespace-pre-wrap">
+      {String(parsed.value)}
+    </pre>
+  );
+}
+
+export function ToolCallGroup({
+  toolCall,
+  response,
+  callKey = toolCall.id,
+  phase = response ? "settled" : "running",
+  active = phase === "running" && !response,
+}: {
   toolCall: ToolCall;
   response?: ToolMessage;
-}
-
-function parseResponseContent(content: ToolMessage["content"]): {
-  structured: unknown | null;
-  text: string;
-} {
-  if (typeof content !== "string") {
-    return { structured: null, text: JSON.stringify(content) };
-  }
-  try {
-    const parsed = JSON.parse(content);
-    if (
-      Array.isArray(parsed) ||
-      (typeof parsed === "object" && parsed !== null)
-    ) {
-      return { structured: parsed, text: content };
-    }
-  } catch {
-    // fall through to plain string
-  }
-  return { structured: null, text: content };
-}
-
-function TextFallback({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const lines = text.split("\n");
-  const tooLong = lines.length > 4 || text.length > 500;
-  const display =
-    tooLong && !expanded
-      ? text.length > 500
-        ? text.slice(0, 500) + "…"
-        : lines.slice(0, 4).join("\n") + "\n…"
-      : text;
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-      <pre className="max-h-[60vh] overflow-auto p-3 font-mono text-sm break-words whitespace-pre-wrap text-gray-800">
-        {display}
-      </pre>
-      {tooLong && (
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="flex w-full cursor-pointer items-center justify-center border-t border-gray-200 py-2 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-        >
-          {expanded ? "Show less" : "Show more"}
-        </button>
-      )}
-    </div>
+  callKey?: string;
+  phase?: ToolPhase;
+  active?: boolean;
+}) {
+  const [expanded, setExpanded] = useDisclosureState(
+    callKey ? `call:${callKey}` : undefined,
   );
-}
-
-function StatusPill({ response }: { response?: ToolMessage }) {
-  if (!response) {
-    return (
-      <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Running
-      </span>
-    );
-  }
-  if (response.status === "error") {
-    return (
-      <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-        <AlertCircle className="h-3 w-3" />
-        Error
-      </span>
-    );
-  }
+  const offsets = useDisclosureOffsets();
+  const payloadRef = useRef<HTMLDivElement>(null);
+  const scrollKey = `payload:${callKey}`;
+  useEffect(() => {
+    if (expanded && payloadRef.current)
+      payloadRef.current.scrollTop = offsets?.get(scrollKey) ?? 0;
+  }, [expanded, offsets, scrollKey]);
+  const failed = response?.status === "error";
+  const unfinished =
+    !response &&
+    (phase === "stopped" || phase === "failed" || phase === "settled");
+  const label =
+    formatToolName(toolCall.name, active) +
+    (failed ? " · failed" : unfinished ? " · unfinished" : "");
+  const missing =
+    phase === "reconnecting"
+      ? "Waiting to reconnect. No response yet."
+      : phase === "stopped"
+        ? "Stopped before a response arrived."
+        : phase === "failed"
+          ? "Run failed before a response arrived."
+          : phase === "settled"
+            ? "No response was recorded."
+            : "No response yet.";
   return (
-    <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-      <CheckCircle2 className="h-3 w-3" />
-      Done
-    </span>
-  );
-}
-
-export function ToolCallGroup({ toolCall, response }: ToolCallGroupProps) {
-  const [expanded, setExpanded] = useState(false);
-  const hasArgs = Object.keys(toolCall.args ?? {}).length > 0;
-
-  const parsed = response ? parseResponseContent(response.content) : null;
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-gray-200">
+    <div
+      className="min-w-0"
+      data-tool-call={callKey}
+    >
       <button
-        onClick={() => setExpanded((e) => !e)}
-        className="flex w-full items-center gap-2 border-gray-200 bg-gray-50 px-3 py-2 text-left transition-colors hover:bg-gray-100"
-        aria-expanded={expanded}
-        aria-label={expanded ? "Collapse tool call" : "Expand tool call"}
-      >
-        <ChevronRight
-          className={cn(
-            "h-4 w-4 flex-shrink-0 text-gray-500 transition-transform",
-            expanded && "rotate-90",
-          )}
-        />
-        <span className="font-medium text-gray-900">
-          {formatToolName(toolCall.name)}
-        </span>
-        <div className="ml-auto">
-          <StatusPill response={response} />
-        </div>
-      </button>
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            key="body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="border-t border-gray-200"
-          >
-            <div className="flex max-h-[45vh] flex-col gap-3 overflow-auto p-3">
-              <section>
-                <h4 className="mb-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                  Arguments
-                </h4>
-                {hasArgs ? (
-                  <JsonViewer
-                    value={toolCall.args}
-                    defaultExpandDepth={2}
-                    copyLabel="Copy args"
-                  />
-                ) : (
-                  <code className="block rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
-                    {"{}"}
-                  </code>
-                )}
-              </section>
-
-              {response && parsed && (
-                <section>
-                  <h4 className="mb-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
-                    Response
-                  </h4>
-                  {parsed.structured !== null ? (
-                    <JsonViewer
-                      value={parsed.structured}
-                      defaultExpandDepth={1}
-                      copyLabel="Copy response"
-                    />
-                  ) : (
-                    <TextFallback text={parsed.text} />
-                  )}
-                </section>
-              )}
-            </div>
-          </motion.div>
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          "tool-disclosure text-muted-foreground hover:text-foreground focus-visible:outline-primary flex min-h-[26px] w-full cursor-pointer items-center py-[3px] text-left text-[11.5px] leading-[1.45] font-normal focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2",
+          failed && "text-destructive",
         )}
-      </AnimatePresence>
+        aria-expanded={expanded}
+        aria-label={`${expanded ? "Collapse" : "Expand"} tool call: ${label}`}
+      >
+        <span className={cn(active && "tool-crest")}>{label}</span>
+        <span className="sr-only">
+          {failed
+            ? "Failed"
+            : response
+              ? "Completed"
+              : unfinished
+                ? "Unfinished"
+                : active
+                  ? "Running"
+                  : "Pending"}
+        </span>
+      </button>
+      {expanded && (
+        <div
+          ref={payloadRef}
+          onScroll={(event) =>
+            offsets?.set(scrollKey, event.currentTarget.scrollTop)
+          }
+          className="bg-background/70 my-1 flex max-h-[184px] flex-col gap-3 overflow-auto overscroll-contain rounded-lg border p-3"
+        >
+          <section>
+            <h4 className="text-muted-foreground mb-1.5 text-[11px] font-medium">
+              Request parameters
+            </h4>
+            <ToolPayload
+              value={toolCall.args ?? {}}
+              persistKey={`${callKey}:request`}
+              label="Request"
+            />
+          </section>
+          <section>
+            <h4 className="text-muted-foreground mb-1.5 text-[11px] font-medium">
+              Response
+            </h4>
+            {response ? (
+              <ToolPayload
+                value={response.content}
+                persistKey={`${callKey}:response`}
+                label="Response"
+              />
+            ) : (
+              <p className="text-muted-foreground text-[11px] leading-relaxed">
+                {missing}
+              </p>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

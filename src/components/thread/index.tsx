@@ -1,41 +1,35 @@
 import { v4 as uuidv4 } from "uuid";
-import { ReactNode, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import {
+  type ReactNode,
+  useState,
+  useRef,
+  useEffect,
+  type FormEvent,
+} from "react";
 import { cn } from "@/lib/utils";
 import { useStreamContext } from "@/providers/Stream";
-import { useState, FormEvent } from "react";
+import { useThreads } from "@/providers/Thread";
 import { Button } from "../ui/button";
-import { Checkpoint, Message } from "@langchain/langgraph-sdk";
+import { type Checkpoint, type Message } from "@langchain/langgraph-sdk";
 import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
-import { HumanMessage } from "./messages/human";
-import {
-  DO_NOT_RENDER_ID_PREFIX,
-  ensureToolCallsHaveResponses,
-} from "@/lib/ensure-tool-responses";
+import { AssistantTranscript } from "./messages/assistant-transcript";
+import { ensureToolCallsHaveResponses } from "@/lib/ensure-tool-responses";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import {
   ArrowDown,
-  LoaderCircle,
-  PanelRightOpen,
-  PanelRightClose,
+  ArrowUp,
+  PanelLeft,
   SquarePen,
   XIcon,
   Plus,
+  Square,
+  LoaderCircle,
+  AlertCircle,
 } from "lucide-react";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import ThreadHistory from "./history";
-import { toast } from "sonner";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { Label } from "../ui/label";
-import { Switch } from "../ui/switch";
 import { GitHubSVG } from "../icons/github";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
 import { useFileUpload } from "@/hooks/use-file-upload";
 import { ContentBlocksPreview } from "./ContentBlocksPreview";
 import {
@@ -44,110 +38,59 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
-import { useLocalStorageState } from "@/hooks/useLocalStorageState";
-import { PlannerModels } from "@/configs/models";
 import { ModelSwitcher } from "./ModelSwitcher";
+import { SuggestedPrompts, FollowUpPrompts } from "./suggested-prompts";
+import { useChatModels } from "@/hooks/use-chat-models";
+import { getThreadTitle } from "@/lib/thread-history";
+import { hasImageContent, precedingHuman } from "@/lib/chat-submission";
+import { toast } from "sonner";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
-function StickyToBottomContent(props: {
-  content: ReactNode;
-  footer?: ReactNode;
-  className?: string;
-  contentClassName?: string;
-}) {
-  const context = useStickToBottomContext();
+function StickyToBottomContent({ children }: { children: ReactNode }) {
+  const { scrollRef, contentRef } = useStickToBottomContext();
   return (
     <div
-      ref={context.scrollRef}
-      style={{ width: "100%", height: "100%" }}
-      className={props.className}
+      ref={scrollRef}
+      className="chat-scroll absolute inset-0 overflow-y-auto overscroll-contain"
     >
       <div
-        ref={context.contentRef}
-        className={props.contentClassName}
+        ref={contentRef}
+        className="mx-auto flex min-h-full w-full max-w-[760px] flex-col gap-4 px-5 pt-6 pb-8 sm:px-8"
       >
-        {props.content}
+        {children}
       </div>
-
-      {props.footer}
     </div>
   );
 }
 
-function ScrollToBottom(props: { className?: string }) {
+function ScrollToBottom() {
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
-
   if (isAtBottom) return null;
   return (
     <Button
+      type="button"
       variant="outline"
-      className={props.className}
+      className="bg-card absolute bottom-3 left-1/2 z-10 min-h-11 -translate-x-1/2 rounded-full text-xs shadow-sm"
       onClick={() => scrollToBottom()}
     >
-      <ArrowDown className="h-4 w-4" />
-      <span>Scroll to bottom</span>
+      <ArrowDown className="size-4" />
+      Jump to latest
     </Button>
-  );
-}
-
-function OpenGitHubRepo() {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <a
-            href={process.env.NEXT_PUBLIC_GITHUB_REPO_URL}
-            target="_blank"
-            className="flex items-center justify-center"
-          >
-            <GitHubSVG
-              width="24"
-              height="24"
-            />
-          </a>
-        </TooltipTrigger>
-        <TooltipContent side="left">
-          <p>Open GitHub repo</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-function ConnectedHost({ apiUrl }: { apiUrl: string }) {
-  let host: string;
-  try {
-    host = new URL(apiUrl).host;
-  } catch {
-    host = apiUrl;
-  }
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="text-muted-foreground hidden max-w-40 truncate text-xs sm:inline">
-            {host}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          <p>Connected to {apiUrl}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
   );
 }
 
 export function Thread() {
   const [artifactContext, setArtifactContext] = useArtifactContext();
   const [artifactOpen, closeArtifact] = useArtifactOpen();
-
-  const [threadId, _setThreadId] = useQueryState("threadId");
+  const [threadId, setThreadId] = useQueryState("threadId");
   const [chatHistoryOpen, setChatHistoryOpen] = useQueryState(
     "chatHistoryOpen",
-    parseAsBoolean.withDefault(false),
-  );
-  const [hideToolCalls, setHideToolCalls] = useQueryState(
-    "hideToolCalls",
     parseAsBoolean.withDefault(false),
   );
   const [input, setInput] = useState("");
@@ -157,534 +100,438 @@ export function Thread() {
     handleFileUpload,
     dropRef,
     removeBlock,
-    resetBlocks: _resetBlocks,
     dragOver,
     handlePaste,
   } = useFileUpload();
-  const [firstTokenReceived, setFirstTokenReceived] = useState(false);
-  const isLargeScreen = useMediaQuery("(min-width: 1024px)");
-  const [selectedModel, setSelectedModel] = useLocalStorageState<PlannerModels>(
-    "lg:chat:selectedModel",
-    PlannerModels.DEEPSEEK_PRO,
-    (value): value is PlannerModels =>
-      typeof value === "string" &&
-      (Object.values(PlannerModels) as string[]).includes(value),
-  );
-
+  const fileInputId = "chat-file-input";
   const stream = useStreamContext();
+  const { threads } = useThreads();
+  const isLargeScreen = useMediaQuery("(min-width: 1024px)");
+  const models = useChatModels(stream.apiUrl, threadId, stream.requestApi);
   const messages = stream.messages;
   const isLoading = stream.isLoading;
-  const nextPromptSuggestions = stream.values?.next_prompt_suggestions ?? [];
+  const canSend = !isLoading && !stream.isThreadLoading && !models.unavailable;
+  const chatStarted = !!threadId || !!messages.length;
+  const currentThread = threads.find((t) => t.thread_id === threadId);
+  const title = currentThread ? getThreadTitle(currentThread) : "Agent Chat";
+  const hasNoAIOrToolMessages = !messages.some(
+    (m) => m.type === "ai" || m.type === "tool",
+  );
+  const waitingForAnswer =
+    isLoading && (messages.at(-1)?.type === "human" || !messages.length);
+  const suggestions = Array.isArray(stream.values?.next_prompt_suggestions)
+    ? stream.values.next_prompt_suggestions
+    : [];
+  const previousThreadId = useRef(threadId);
+  useEffect(() => {
+    if (previousThreadId.current === threadId) return;
+    // Browser back/forward is also a conversation switch. A newly allocated
+    // thread may retain the artifact context used to start its first turn.
+    if (previousThreadId.current !== null || !stream.isLoading) {
+      setInput("");
+      setContentBlocks([]);
+      closeArtifact();
+      setArtifactContext({});
+    }
+    previousThreadId.current = threadId;
+  }, [
+    threadId,
+    stream.isLoading,
+    closeArtifact,
+    setArtifactContext,
+    setContentBlocks,
+  ]);
 
-  const lastError = useRef<string | undefined>(undefined);
-
-  const setThreadId = (id: string | null) => {
-    _setThreadId(id);
-
-    // close artifact and reset artifact context
+  const openConversation = (id: string | null) => {
+    if (id === threadId && id !== null) return;
+    models.cancelPendingSelection();
+    setInput("");
+    setContentBlocks([]);
     closeArtifact();
     setArtifactContext({});
+    void setThreadId(id);
+    if (!isLargeScreen) void setChatHistoryOpen(false);
   };
 
-  useEffect(() => {
-    if (!stream.error) {
-      lastError.current = undefined;
+  const validateSubmission = (message?: Message) => {
+    if (isLoading || stream.isThreadLoading) return false;
+    if (models.unavailable) {
+      toast.error("This model is unavailable. Choose another model or Auto.");
+      return false;
+    }
+    if (!models.supportsImages && hasImageContent(message?.content)) {
+      toast.error("Choose a model that supports images to send this turn.");
+      return false;
+    }
+    return true;
+  };
+  const send = (text: string, attachments = contentBlocks) => {
+    if (!canSend || (!text.trim() && !attachments.length)) return;
+    if (!models.supportsImages && hasImageContent(attachments)) {
+      toast.error("Choose a model that supports images or remove the image.");
       return;
     }
-    try {
-      const message = (stream.error as any).message;
-      if (!message || lastError.current === message) {
-        // Message has already been logged. do not modify ref, return early.
-        return;
-      }
-
-      // Message is defined, and it has not been logged yet. Save it, and send the error
-      lastError.current = message;
-      toast.error("An error occurred. Please try again.", {
-        description: (
-          <p>
-            <strong>Error:</strong> <code>{message}</code>
-          </p>
-        ),
-        richColors: true,
-        closeButton: true,
-      });
-    } catch {
-      // no-op
-    }
-  }, [stream.error]);
-
-  // TODO: this should be part of the useStream hook
-  const prevMessageLength = useRef(0);
-  useEffect(() => {
-    if (
-      messages.length !== prevMessageLength.current &&
-      messages?.length &&
-      messages[messages.length - 1].type === "ai"
-    ) {
-      setFirstTokenReceived(true);
-    }
-
-    prevMessageLength.current = messages.length;
-  }, [messages]);
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if ((input.trim().length === 0 && contentBlocks.length === 0) || isLoading)
-      return;
-    setFirstTokenReceived(false);
-
-    const newHumanMessage: Message = {
+    const human: Message = {
       id: uuidv4(),
       type: "human",
       content: [
-        ...(input.trim().length > 0 ? [{ type: "text", text: input }] : []),
-        ...contentBlocks,
+        ...(text.trim() ? [{ type: "text", text: text.trim() }] : []),
+        ...attachments,
       ] as Message["content"],
     };
-
-    const toolMessages = ensureToolCallsHaveResponses(stream.messages);
-
-    const context =
-      Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
-
-    stream.submit(
-      { messages: [...toolMessages, newHumanMessage], context },
+    const toolMessages = ensureToolCallsHaveResponses(messages);
+    const context = Object.keys(artifactContext).length
+      ? artifactContext
+      : undefined;
+    void stream.submit(
+      { messages: [...toolMessages, human], context },
       {
+        ...models.submissionOptions(),
         streamMode: ["values"],
         streamSubgraphs: true,
         streamResumable: true,
-        config: {
-          configurable: {
-            tradekit_agent_model: selectedModel,
-          },
-        },
-        optimisticValues: (prev) => ({
-          ...prev,
-          context,
-          messages: [
-            ...(prev.messages ?? []),
-            ...toolMessages,
-            newHumanMessage,
-          ],
-        }),
-      },
-    );
-
-    setInput("");
-    setContentBlocks([]);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    if (isLoading || !suggestion.trim()) return;
-    setFirstTokenReceived(false);
-
-    const newHumanMessage: Message = {
-      id: uuidv4(),
-      type: "human",
-      content: [{ type: "text", text: suggestion }] as Message["content"],
-    };
-
-    const toolMessages = ensureToolCallsHaveResponses(stream.messages);
-    const context =
-      Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
-
-    stream.submit(
-      { messages: [...toolMessages, newHumanMessage], context },
-      {
-        streamMode: ["values"],
-        streamSubgraphs: true,
-        streamResumable: true,
-        config: {
-          configurable: {
-            tradekit_agent_model: selectedModel,
-          },
-        },
         optimisticValues: (prev) => ({
           ...prev,
           context,
           next_prompt_suggestions: [],
-          messages: [
-            ...(prev.messages ?? []),
-            ...toolMessages,
-            newHumanMessage,
-          ],
+          messages: [...(prev.messages ?? []), ...toolMessages, human],
         }),
       },
     );
+    setInput("");
+    setContentBlocks([]);
   };
-
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    send(input);
+  };
   const handleRegenerate = (
-    parentCheckpoint: Checkpoint | null | undefined,
+    checkpoint: Checkpoint | null | undefined,
+    message?: Message,
   ) => {
-    // Do this so the loading state is correct
-    prevMessageLength.current = prevMessageLength.current - 1;
-    setFirstTokenReceived(false);
-    stream.submit(undefined, {
-      checkpoint: parentCheckpoint,
+    if (!validateSubmission(precedingHuman(messages, message))) return;
+    void stream.submit(undefined, {
+      ...models.submissionOptions(),
+      checkpoint,
       streamMode: ["values"],
       streamSubgraphs: true,
       streamResumable: true,
-      config: {
-        configurable: {
-          tradekit_agent_model: selectedModel,
-        },
-      },
     });
   };
-
-  const chatStarted = !!threadId || !!messages.length;
-  const hasNoAIOrToolMessages = !messages.find(
-    (m) => m.type === "ai" || m.type === "tool",
-  );
-
-  const absorbedToolMessageIds = new Set<string>();
-  for (const m of messages) {
-    if (m.type === "ai" && "tool_calls" in m && Array.isArray(m.tool_calls)) {
-      for (const tc of m.tool_calls) {
-        if (!tc.id) continue;
-        const resp = messages.find(
-          (r) => r.type === "tool" && r.tool_call_id === tc.id,
-        );
-        if (resp?.id) absorbedToolMessageIds.add(resp.id);
-      }
+  const handleRetry = () => {
+    // Loading a conversation with no readable state does not start a model run.
+    if (!messages.length) {
+      if (!isLoading && !stream.isThreadLoading)
+        void stream.reloadConversation();
+      return;
     }
-  }
+    if (!validateSubmission(precedingHuman(messages))) return;
+    void stream.retry(models.submissionOptions());
+  };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
-      <div className="relative hidden lg:flex">
-        <motion.div
-          className="absolute z-20 h-full overflow-hidden border-r bg-white"
-          style={{ width: 300 }}
-          animate={
-            isLargeScreen
-              ? { x: chatHistoryOpen ? 0 : -300 }
-              : { x: chatHistoryOpen ? 0 : -300 }
-          }
-          initial={{ x: -300 }}
-          transition={
-            isLargeScreen
-              ? { type: "spring", stiffness: 300, damping: 30 }
-              : { duration: 0 }
-          }
-        >
-          <div
-            className="relative h-full"
-            style={{ width: 300 }}
-          >
-            <ThreadHistory />
-          </div>
-        </motion.div>
-      </div>
-
+    <div className="bg-background relative flex h-dvh w-full overflow-hidden">
       <div
         className={cn(
-          "grid w-full grid-cols-[1fr_0fr] transition-all duration-500",
-          artifactOpen && "grid-cols-[3fr_2fr]",
+          "shrink-0 overflow-hidden transition-[width] duration-200 motion-reduce:transition-none",
+          chatHistoryOpen ? "w-0 lg:w-[290px]" : "w-0",
         )}
+        inert={!chatHistoryOpen}
       >
-        <motion.div
-          className={cn(
-            "relative flex min-w-0 flex-1 flex-col overflow-hidden",
-            !chatStarted && "grid-rows-[1fr]",
-          )}
-          layout={isLargeScreen}
-          animate={{
-            marginLeft: chatHistoryOpen ? (isLargeScreen ? 300 : 0) : 0,
-            width: chatHistoryOpen
-              ? isLargeScreen
-                ? "calc(100% - 300px)"
-                : "100%"
-              : "100%",
-          }}
-          transition={
-            isLargeScreen
-              ? { type: "spring", stiffness: 300, damping: 30 }
-              : { duration: 0 }
-          }
-        >
-          {!chatStarted && (
-            <div className="absolute top-0 left-0 z-10 flex w-full items-center justify-between gap-3 p-2 pl-4">
-              <div>
-                {(!chatHistoryOpen || !isLargeScreen) && (
-                  <Button
-                    className="hover:bg-gray-100"
-                    variant="ghost"
-                    onClick={() => setChatHistoryOpen((p) => !p)}
-                  >
-                    {chatHistoryOpen ? (
-                      <PanelRightOpen className="size-5" />
-                    ) : (
-                      <PanelRightClose className="size-5" />
-                    )}
-                  </Button>
-                )}
-              </div>
-              <div className="absolute top-2 right-4 flex items-center gap-4">
-                <ModelSwitcher
-                  value={selectedModel}
-                  onValueChange={setSelectedModel}
-                />
-                <OpenGitHubRepo />
-              </div>
-            </div>
-          )}
-          {chatStarted && (
-            <div className="relative z-10 flex items-center justify-between gap-3 p-2">
-              <div className="relative flex items-center justify-start gap-2">
-                <div className="absolute left-0 z-10">
-                  {(!chatHistoryOpen || !isLargeScreen) && (
-                    <Button
-                      className="hover:bg-gray-100"
-                      variant="ghost"
-                      onClick={() => setChatHistoryOpen((p) => !p)}
-                    >
-                      {chatHistoryOpen ? (
-                        <PanelRightOpen className="size-5" />
-                      ) : (
-                        <PanelRightClose className="size-5" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <motion.button
-                  className="flex cursor-pointer items-center gap-2"
-                  onClick={() => setThreadId(null)}
-                  animate={{
-                    marginLeft: !chatHistoryOpen ? 48 : 0,
-                  }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                  }}
-                >
-                  <span className="text-xl font-semibold tracking-tight">
-                    Agent Chat
-                  </span>
-                </motion.button>
-                <ConnectedHost apiUrl={stream.apiUrl} />
-              </div>
-
-              <div className="flex items-center gap-4">
-                <ModelSwitcher
-                  value={selectedModel}
-                  onValueChange={setSelectedModel}
-                />
-                <div className="flex items-center">
-                  <OpenGitHubRepo />
-                </div>
-                <TooltipIconButton
-                  size="lg"
-                  className="p-4"
-                  tooltip="New thread"
-                  variant="ghost"
-                  onClick={() => setThreadId(null)}
-                >
-                  <SquarePen className="size-5" />
-                </TooltipIconButton>
-              </div>
-
-              <div className="from-background to-background/0 absolute inset-x-0 top-full h-5 bg-gradient-to-b" />
-            </div>
-          )}
-
-          <StickToBottom className="relative flex-1 overflow-hidden">
-            <StickyToBottomContent
-              className={cn(
-                "absolute inset-0 overflow-y-scroll px-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent",
-                !chatStarted && "mt-[25vh] flex flex-col items-stretch",
-                chatStarted && "grid grid-rows-[1fr_auto]",
-              )}
-              contentClassName="pt-8 pb-16 max-w-3xl mx-auto flex flex-col gap-4 w-full"
-              content={
-                <>
-                  {messages
-                    .filter((m) => !m.id?.startsWith(DO_NOT_RENDER_ID_PREFIX))
-                    .filter(
-                      (m) =>
-                        !(
-                          m.type === "tool" &&
-                          m.id &&
-                          absorbedToolMessageIds.has(m.id)
-                        ),
-                    )
-                    .map((message, index) =>
-                      message.type === "human" ? (
-                        <HumanMessage
-                          key={message.id || `${message.type}-${index}`}
-                          message={message}
-                          isLoading={isLoading}
-                        />
-                      ) : (
-                        <AssistantMessage
-                          key={message.id || `${message.type}-${index}`}
-                          message={message}
-                          isLoading={isLoading}
-                          handleRegenerate={handleRegenerate}
-                        />
-                      ),
-                    )}
-                  {/* Special rendering case where there are no AI/tool messages, but there is an interrupt.
-                    We need to render it outside of the messages list, since there are no messages to render */}
-                  {hasNoAIOrToolMessages && !!stream.interrupt && (
-                    <AssistantMessage
-                      key="interrupt-msg"
-                      message={undefined}
-                      isLoading={isLoading}
-                      handleRegenerate={handleRegenerate}
-                    />
-                  )}
-                  {isLoading && !firstTokenReceived && (
-                    <AssistantMessageLoading />
-                  )}
-                  {!isLoading &&
-                    nextPromptSuggestions.length > 0 &&
-                    messages.length > 0 &&
-                    messages[messages.length - 1].type === "ai" && (
-                      <div className="mr-auto flex w-full flex-wrap gap-2 pt-1">
-                        {nextPromptSuggestions.map((suggestion, idx) => (
-                          <button
-                            key={`${idx}-${suggestion}`}
-                            type="button"
-                            onClick={() => handleSuggestionClick(suggestion)}
-                            className="bg-muted hover:bg-muted/70 cursor-pointer rounded-full border px-3 py-1.5 text-left text-sm transition-colors"
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                </>
-              }
-              footer={
-                <div className="sticky bottom-0 flex flex-col items-center gap-8 bg-white">
-                  {!chatStarted && (
-                    <div className="flex items-center gap-3">
-                      <h1 className="text-2xl font-semibold tracking-tight">
-                        Agent Chat
-                      </h1>
-                    </div>
-                  )}
-
-                  <ScrollToBottom className="animate-in fade-in-0 zoom-in-95 absolute bottom-full left-1/2 mb-4 -translate-x-1/2" />
-
-                  <div
-                    ref={dropRef}
-                    className={cn(
-                      "bg-muted relative z-10 mx-auto mb-8 w-full max-w-3xl rounded-2xl shadow-xs transition-all",
-                      dragOver
-                        ? "border-primary border-2 border-dotted"
-                        : "border border-solid",
-                    )}
-                  >
-                    <form
-                      onSubmit={handleSubmit}
-                      className="mx-auto grid max-w-3xl grid-rows-[1fr_auto] gap-2"
-                    >
-                      <ContentBlocksPreview
-                        blocks={contentBlocks}
-                        onRemove={removeBlock}
-                      />
-                      <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onPaste={handlePaste}
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            !e.shiftKey &&
-                            !e.metaKey &&
-                            !e.nativeEvent.isComposing
-                          ) {
-                            e.preventDefault();
-                            const el = e.target as HTMLElement | undefined;
-                            const form = el?.closest("form");
-                            form?.requestSubmit();
-                          }
-                        }}
-                        placeholder="Type your message..."
-                        className="field-sizing-content resize-none border-none bg-transparent p-3.5 pb-0 shadow-none ring-0 outline-none focus:ring-0 focus:outline-none"
-                      />
-
-                      <div className="flex items-center gap-6 p-2 pt-4">
-                        {/* <div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="render-tool-calls"
-                              checked={hideToolCalls ?? false}
-                              onCheckedChange={setHideToolCalls}
-                            />
-                            <Label
-                              htmlFor="render-tool-calls"
-                              className="text-sm text-gray-600"
-                            >
-                              Hide Tool Calls
-                            </Label>
-                          </div>
-                        </div> */}
-                        <Label
-                          htmlFor="file-input"
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <Plus className="size-5 text-gray-600" />
-                          <span className="text-sm text-gray-600">
-                            Upload PDF or Image
-                          </span>
-                        </Label>
-                        <input
-                          id="file-input"
-                          type="file"
-                          onChange={handleFileUpload}
-                          multiple
-                          accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
-                          className="hidden"
-                        />
-                        {stream.isLoading ? (
-                          <Button
-                            key="stop"
-                            onClick={() => stream.stop()}
-                            className="ml-auto"
-                          >
-                            <LoaderCircle className="h-4 w-4 animate-spin" />
-                            Cancel
-                          </Button>
-                        ) : (
-                          <Button
-                            type="submit"
-                            className="ml-auto shadow-md transition-all"
-                            disabled={
-                              isLoading ||
-                              (!input.trim() && contentBlocks.length === 0)
-                            }
-                          >
-                            Send
-                          </Button>
-                        )}
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              }
-            />
-          </StickToBottom>
-        </motion.div>
-        <div className="relative flex flex-col border-l">
-          <div className="absolute inset-0 flex min-w-[30vw] flex-col">
-            <div className="grid grid-cols-[1fr_auto] border-b p-4">
-              <ArtifactTitle className="truncate overflow-hidden" />
-              <button
-                onClick={closeArtifact}
-                className="cursor-pointer"
+        {/* Always mount: the narrow drawer portals outside this desktop wrapper. */}
+        <ThreadHistory
+          onNewChat={() => openConversation(null)}
+          onThreadSelect={openConversation}
+        />
+      </div>
+      <main
+        className="relative flex min-w-0 flex-1 flex-col"
+        aria-label="Chat"
+      >
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <TooltipIconButton
+              tooltip={chatHistoryOpen ? "Close history" : "Open history"}
+              variant="ghost"
+              className="size-11 rounded-full"
+              onClick={() => setChatHistoryOpen(!chatHistoryOpen)}
+              aria-expanded={chatHistoryOpen}
+            >
+              <PanelLeft className="size-5" />
+            </TooltipIconButton>
+            <h2 className="truncate text-sm font-medium">{title}</h2>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {process.env.NEXT_PUBLIC_GITHUB_REPO_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_GITHUB_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open GitHub repository"
+                className="text-muted-foreground hover:bg-accent hidden size-11 items-center justify-center rounded-full sm:flex"
               >
-                <XIcon className="size-5" />
-              </button>
+                <GitHubSVG
+                  width="18"
+                  height="18"
+                />
+              </a>
+            )}
+            <TooltipIconButton
+              tooltip="New chat"
+              variant="ghost"
+              className="size-11 rounded-full"
+              onClick={() => openConversation(null)}
+            >
+              <SquarePen className="size-5" />
+            </TooltipIconButton>
+          </div>
+        </header>
+        <StickToBottom
+          key={threadId ?? "new"}
+          className="relative min-h-0 flex-1 overflow-hidden"
+          initial="instant"
+          resize="smooth"
+        >
+          <StickyToBottomContent>
+            {stream.isThreadLoading && !messages.length ? (
+              <div
+                className="space-y-5 py-3"
+                role="status"
+                aria-label="Loading conversation"
+              >
+                <div className="bg-muted ml-auto h-14 w-2/3 animate-pulse rounded-[14px]" />
+                <div className="bg-muted h-28 w-full animate-pulse rounded-[14px]" />
+                <span className="sr-only">Loading conversation…</span>
+              </div>
+            ) : !chatStarted ? (
+              <div className="my-auto">
+                <SuggestedPrompts
+                  onSelect={(text) => send(text, [])}
+                  disabled={!canSend}
+                />
+              </div>
+            ) : (
+              <AssistantTranscript
+                messages={messages}
+                isLoading={isLoading || stream.isThreadLoading}
+                handleRegenerate={handleRegenerate}
+                getSubmitOptions={models.submissionOptions}
+                canSubmitMessage={validateSubmission}
+              />
+            )}
+            {hasNoAIOrToolMessages && !!stream.interrupt && (
+              <AssistantMessage
+                message={undefined}
+                isLoading={isLoading}
+                handleRegenerate={handleRegenerate}
+              />
+            )}
+            {waitingForAnswer && <AssistantMessageLoading />}
+            {!isLoading && !stream.error && messages.length > 0 && (
+              <FollowUpPrompts
+                suggestions={suggestions}
+                onSelect={(text) => send(text, [])}
+              />
+            )}
+          </StickyToBottomContent>
+          <ScrollToBottom />
+        </StickToBottom>
+        <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pt-1 pb-[max(16px,env(safe-area-inset-bottom))] sm:px-8 sm:pb-6">
+          {!!stream.error && (
+            <div
+              className="bg-muted text-foreground border-destructive/20 mb-3 flex items-center gap-3 rounded-[14px] border px-3.5 py-2.5 text-xs"
+              role="alert"
+            >
+              <AlertCircle className="text-destructive size-4 shrink-0" />
+              <span className="flex-1">
+                {messages.length
+                  ? "The conversation was interrupted."
+                  : "Couldn't load this conversation."}{" "}
+                Your messages are still here.
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-primary min-h-11 shrink-0 rounded-full text-xs"
+                disabled={
+                  isLoading ||
+                  stream.isThreadLoading ||
+                  (!!messages.length && models.unavailable)
+                }
+                onClick={handleRetry}
+              >
+                Try again
+              </Button>
             </div>
-            <ArtifactContent className="relative flex-grow" />
+          )}
+          {!stream.error && stream.runStatus === "stopped" && (
+            <div
+              className="text-muted-foreground mb-2 flex items-center justify-between px-3 text-xs"
+              role="status"
+            >
+              <span>Response stopped</span>
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11 rounded-full text-xs"
+                disabled={!canSend}
+                onClick={handleRetry}
+              >
+                Run again
+              </Button>
+            </div>
+          )}
+          {stream.runStatus === "reconnecting" && (
+            <p
+              className="text-muted-foreground mb-2 px-3 text-xs"
+              role="status"
+            >
+              Reconnecting… Your answer will continue here.
+            </p>
+          )}
+          {models.unavailable && (
+            <p
+              className="text-destructive mb-2 px-3 text-xs"
+              role="status"
+            >
+              This model is unavailable. Choose another model or Auto to send.
+            </p>
+          )}
+          <div
+            ref={dropRef}
+            className={cn(
+              "chat-composer relative",
+              dragOver && "border-primary bg-accent border-dashed",
+            )}
+          >
+            <form
+              onSubmit={handleSubmit}
+              aria-label="Message composer"
+            >
+              <ContentBlocksPreview
+                blocks={contentBlocks}
+                onRemove={removeBlock}
+              />
+              <div className="flex min-h-12 items-center gap-1 pr-1 pl-2">
+                <TooltipIconButton
+                  type="button"
+                  tooltip="Upload PDF or image"
+                  variant="ghost"
+                  className="text-muted-foreground size-11 shrink-0 rounded-full"
+                  onClick={() => document.getElementById(fileInputId)?.click()}
+                >
+                  <Plus className="size-5" />
+                </TooltipIconButton>
+                <input
+                  id={fileInputId}
+                  type="file"
+                  onChange={handleFileUpload}
+                  multiple
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                  className="hidden"
+                  aria-label="Upload PDF or image"
+                />
+                <textarea
+                  rows={1}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onPaste={handlePaste}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !e.shiftKey &&
+                      !e.metaKey &&
+                      !e.ctrlKey &&
+                      !e.nativeEvent.isComposing
+                    ) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  placeholder="Ask the analyst…"
+                  aria-label="Your message"
+                  className="text-foreground placeholder:text-muted-foreground field-sizing-content max-h-36 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent py-[13px] text-sm leading-[1.55] outline-none focus-visible:outline-none"
+                />
+                <Button
+                  type={isLoading ? "button" : "submit"}
+                  aria-label={isLoading ? "Stop response" : "Send message"}
+                  title={isLoading ? "Stop" : "Send"}
+                  className={cn(
+                    "disabled:bg-secondary disabled:text-muted-foreground size-11 shrink-0 rounded-full p-0 shadow-none disabled:opacity-100",
+                    isLoading
+                      ? "text-destructive bg-[var(--negative-container)] hover:bg-[var(--negative-container)]"
+                      : "text-white [background:var(--brand-gradient)]",
+                  )}
+                  disabled={
+                    isLoading
+                      ? stream.runStatus === "stopping"
+                      : !canSend || (!input.trim() && !contentBlocks.length)
+                  }
+                  onClick={isLoading ? () => void stream.stop() : undefined}
+                >
+                  {stream.runStatus === "stopping" ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : isLoading ? (
+                    <Square className="size-4 fill-current" />
+                  ) : (
+                    <ArrowUp className="size-5" />
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+          <div className="mt-2 flex min-h-9 items-center justify-between gap-2 px-1">
+            <ModelSwitcher
+              value={models.value}
+              onValueChange={models.select}
+              options={models.options}
+              disabled={isLoading || stream.isThreadLoading}
+              className="max-w-[200px] border-transparent bg-transparent"
+            />
+            <span className="text-muted-foreground hidden text-[10px] sm:block">
+              Enter to send · Shift + Enter for a new line
+            </span>
           </div>
         </div>
-      </div>
+      </main>
+      {artifactOpen && isLargeScreen && (
+        <aside
+          className="bg-card flex w-[40%] max-w-[700px] min-w-0 flex-col border-l"
+          aria-label="Artifact"
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
+            <ArtifactTitle className="min-w-0 truncate text-sm font-medium" />
+            <TooltipIconButton
+              tooltip="Close artifact"
+              variant="ghost"
+              className="size-11 rounded-full"
+              onClick={closeArtifact}
+            >
+              <XIcon className="size-5" />
+            </TooltipIconButton>
+          </div>
+          <ArtifactContent className="relative min-h-0 flex-1 overflow-auto" />
+        </aside>
+      )}
+      <Sheet
+        open={artifactOpen && !isLargeScreen}
+        onOpenChange={(open) => {
+          if (!open) closeArtifact();
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="w-full max-w-none gap-0 sm:max-w-none"
+          aria-describedby={undefined}
+        >
+          <SheetHeader className="h-14 border-b pr-14">
+            <SheetTitle className="truncate text-sm font-medium">
+              <ArtifactTitle />
+            </SheetTitle>
+          </SheetHeader>
+          <ArtifactContent className="relative min-h-0 flex-1 overflow-auto" />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

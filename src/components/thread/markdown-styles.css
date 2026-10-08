@@ -1,13 +1,22 @@
-/* Base markdown styles */
+/* Current mobile chat override: message_bubble.dart (#277), 13px / 1.5. */
+.markdown-content {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.markdown-content strong {
+  font-weight: 600;
+}
 .markdown-content code:not(pre code) {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--muted);
   padding: 0.2em 0.4em;
   border-radius: 3px;
   font-size: 0.9em;
 }
 
 .markdown-content a {
-  color: #0070f3;
+  color: var(--primary);
   text-decoration: none;
 }
 
@@ -16,13 +25,14 @@
 }
 
 .markdown-content blockquote {
-  border-left: 4px solid #ddd;
+  border-left: 1px solid var(--border);
   padding-left: 1rem;
-  color: #666;
+  color: var(--muted-foreground);
 }
 
 .markdown-content pre {
   overflow-x: auto;
+  overflow-wrap: normal;
 }
 
 .markdown-content table {
@@ -32,14 +42,24 @@
 
 .markdown-content th,
 .markdown-content td {
-  border: 1px solid #ddd;
+  border-color: var(--border);
   padding: 8px;
 }
 
 .markdown-content th {
-  background-color: #f2f2f2;
+  background-color: var(--muted);
 }
 
 .markdown-content tr:nth-child(even) {
-  background-color: #f9f9f9;
+  background-color: var(--muted);
+}
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+.markdown-content .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }

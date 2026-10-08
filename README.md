@@ -2,6 +2,22 @@
 
 Agent Chat UI is a Next.js application which enables chatting with any LangGraph server with a `messages` key through a chat interface.
 
+## Shared chat template
+
+The chat presentation follows the current FinSharpe-Mobile source: local Inter 400/500/600, compact prose and headings, navy/blue surfaces, a pill composer, and three categories of suggested prompts. Desktop history uses a sidebar; narrow screens use a searchable drawer. Titles prefer server metadata, with the first human message as a fallback. History groups conversations by recency and refreshes after runs.
+
+LangGraph's web SDK still owns streaming, authoritative state updates, checkpoints, branching, and transport retries. The template adds authenticated run discovery/rejoining when reopening a conversation, confirmed server cancellation, and recovery that retains messages without duplicating an unaccepted question. Switching conversations scopes recovery and model preferences to their deployment/thread. Human edits preserve attached files and images.
+
+Tool results are paired by `tool_call_id`. One or two consecutive calls remain individual disclosures; three or more form a local expandable group. Prose, reports, and custom UI separate groups. Disclosure and nested JSON state survive streaming/completion. Rich reports remain beside their originating call, including when tool details are hidden. Self-contained `additional_kwargs.mcp_app` HTML uses a sandboxed iframe and the mobile report bridge. Filing citations support immediate quoted passages, passage navigation, and authenticated PDF retrieval.
+
+When `/api/models` supplies a valid catalog, a pinned model uses run `context: { model, model_switcher_enabled: false }`; Auto omits the override. The existing `config.configurable.tradekit_agent_model` integration remains the fallback for deployments without that catalog. Catalog and filing requests use the configured API/authentication, including the existing passthrough. Client-specific authentication and deployment configuration must be preserved when propagating these changes.
+
+### Local chat verification
+
+Run `pnpm test`, `pnpm lint`, `pnpm exec tsc --noEmit`, and `pnpm build`. Focused coverage includes history, model preferences/availability, tool ordering/disclosures, report messaging, citations, stop/retry/rejoin, and multimodal edits.
+
+`node tests/support/mock-langgraph-server.mjs` starts a synthetic backend on `127.0.0.1:3200`. In a separate terminal, start the UI with temporary `NEXT_PUBLIC_API_URL=http://127.0.0.1:3200` and `NEXT_PUBLIC_ASSISTANT_ID=orchestrator`. Keep saved deployment settings unchanged. The fixture offers normal, slow, failed-submit, failed-run, and interrupted-connection scenarios through `/__scenario`, with received requests at `/__state`. These fixtures validate the UI/SDK integration; production contracts were checked against the mobile transport and backend implementation, and an authenticated live deployment still needs its own smoke check.
+
 > [!NOTE]
 > 🎥 Watch the video setup guide [here](https://youtu.be/lInrwVnZ83o).
 

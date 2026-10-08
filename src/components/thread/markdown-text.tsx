@@ -2,7 +2,7 @@
 
 import "./markdown-styles.css";
 
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
@@ -47,7 +47,7 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-t-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white">
+    <div className="flex items-center justify-between gap-4 rounded-t-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white">
       <span className="lowercase [&>span]:text-xs">{language}</span>
       <TooltipIconButton
         tooltip="Copy"
@@ -64,7 +64,7 @@ const defaultComponents: any = {
   h1: ({ className, ...props }: { className?: string }) => (
     <h1
       className={cn(
-        "mb-8 scroll-m-20 text-4xl font-extrabold tracking-tight last:mb-0",
+        "mt-4 mb-2 text-sm leading-[1.4] font-semibold first:mt-0 last:mb-0",
         className,
       )}
       {...props}
@@ -73,7 +73,7 @@ const defaultComponents: any = {
   h2: ({ className, ...props }: { className?: string }) => (
     <h2
       className={cn(
-        "mt-8 mb-4 scroll-m-20 text-3xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "mt-4 mb-2 text-[13px] leading-normal font-semibold first:mt-0 last:mb-0",
         className,
       )}
       {...props}
@@ -82,7 +82,7 @@ const defaultComponents: any = {
   h3: ({ className, ...props }: { className?: string }) => (
     <h3
       className={cn(
-        "mt-6 mb-4 scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "mt-3 mb-2 text-[13px] leading-normal font-medium first:mt-0 last:mb-0",
         className,
       )}
       {...props}
@@ -91,7 +91,7 @@ const defaultComponents: any = {
   h4: ({ className, ...props }: { className?: string }) => (
     <h4
       className={cn(
-        "mt-6 mb-4 scroll-m-20 text-xl font-semibold tracking-tight first:mt-0 last:mb-0",
+        "mt-3 mb-2 text-[13px] font-medium first:mt-0 last:mb-0",
         className,
       )}
       {...props}
@@ -100,7 +100,7 @@ const defaultComponents: any = {
   h5: ({ className, ...props }: { className?: string }) => (
     <h5
       className={cn(
-        "my-4 text-lg font-semibold first:mt-0 last:mb-0",
+        "mt-3 mb-2 text-xs font-medium first:mt-0 last:mb-0",
         className,
       )}
       {...props}
@@ -108,13 +108,16 @@ const defaultComponents: any = {
   ),
   h6: ({ className, ...props }: { className?: string }) => (
     <h6
-      className={cn("my-4 font-semibold first:mt-0 last:mb-0", className)}
+      className={cn(
+        "mt-3 mb-2 text-[11px] font-medium first:mt-0 last:mb-0",
+        className,
+      )}
       {...props}
     />
   ),
   p: ({ className, ...props }: { className?: string }) => (
     <p
-      className={cn("mt-5 mb-5 leading-7 first:mt-0 last:mb-0", className)}
+      className={cn("my-2 leading-normal first:mt-0 last:mb-0", className)}
       {...props}
     />
   ),
@@ -129,41 +132,51 @@ const defaultComponents: any = {
   ),
   blockquote: ({ className, ...props }: { className?: string }) => (
     <blockquote
-      className={cn("border-l-2 pl-6 italic", className)}
+      className={cn("text-muted-foreground border-l pl-3", className)}
       {...props}
     />
   ),
   ul: ({ className, ...props }: { className?: string }) => (
     <ul
-      className={cn("my-5 ml-6 list-disc [&>li]:mt-2", className)}
-      {...props}
-    />
-  ),
-  ol: ({ className, ...props }: { className?: string }) => (
-    <ol
-      className={cn("my-5 ml-6 list-decimal [&>li]:mt-2", className)}
-      {...props}
-    />
-  ),
-  hr: ({ className, ...props }: { className?: string }) => (
-    <hr
-      className={cn("my-5 border-b", className)}
-      {...props}
-    />
-  ),
-  table: ({ className, ...props }: { className?: string }) => (
-    <table
       className={cn(
-        "my-5 w-full border-separate border-spacing-0 overflow-y-auto",
+        "marker:text-muted-foreground my-2 ml-5 list-disc [&>li]:mt-1",
         className,
       )}
       {...props}
     />
   ),
+  ol: ({ className, ...props }: { className?: string }) => (
+    <ol
+      className={cn(
+        "marker:text-muted-foreground my-2 ml-5 list-decimal [&>li]:mt-1",
+        className,
+      )}
+      {...props}
+    />
+  ),
+  hr: ({ className, ...props }: { className?: string }) => (
+    <hr
+      className={cn("border-border my-3", className)}
+      {...props}
+    />
+  ),
+  table: ({ className, ...props }: { className?: string }) => (
+    <div
+      className="my-3 max-w-full overflow-x-auto rounded-lg border"
+      role="region"
+      aria-label="Data table"
+      tabIndex={0}
+    >
+      <table
+        className={cn("w-full border-collapse text-xs tabular-nums", className)}
+        {...props}
+      />
+    </div>
+  ),
   th: ({ className, ...props }: { className?: string }) => (
     <th
       className={cn(
-        "bg-muted px-4 py-2 text-left font-bold first:rounded-tl-lg last:rounded-tr-lg [&[align=center]]:text-center [&[align=right]]:text-right",
+        "bg-muted px-3 py-2 text-left font-semibold [&[align=center]]:text-center [&[align=right]]:text-right",
         className,
       )}
       {...props}
@@ -172,7 +185,7 @@ const defaultComponents: any = {
   td: ({ className, ...props }: { className?: string }) => (
     <td
       className={cn(
-        "border-b border-l px-4 py-2 text-left last:border-r [&[align=center]]:text-center [&[align=right]]:text-right",
+        "border-b px-3 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right",
         className,
       )}
       {...props}
@@ -180,10 +193,7 @@ const defaultComponents: any = {
   ),
   tr: ({ className, ...props }: { className?: string }) => (
     <tr
-      className={cn(
-        "m-0 border-b p-0 first:border-t [&:last-child>td:first-child]:rounded-bl-lg [&:last-child>td:last-child]:rounded-br-lg",
-        className,
-      )}
+      className={cn("m-0 p-0 last:[&>td]:border-b-0", className)}
       {...props}
     />
   ),
@@ -196,7 +206,7 @@ const defaultComponents: any = {
   pre: ({ className, ...props }: { className?: string }) => (
     <pre
       className={cn(
-        "max-w-4xl overflow-x-auto rounded-lg bg-black text-white",
+        "my-3 max-w-full overflow-x-auto rounded-lg bg-zinc-950 text-white",
         className,
       )}
       {...props}
@@ -234,7 +244,7 @@ const defaultComponents: any = {
 
     return (
       <code
-        className={cn("rounded font-semibold", className)}
+        className={cn("rounded font-medium", className)}
         {...props}
       >
         {children}
@@ -243,13 +253,16 @@ const defaultComponents: any = {
   },
 };
 
-const MarkdownTextImpl: FC<{ children: string }> = ({ children }) => {
+const MarkdownTextImpl: FC<{ children: string; components?: Components }> = ({
+  children,
+  components,
+}) => {
   return (
     <div className="markdown-content">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        components={defaultComponents}
+        components={{ ...defaultComponents, ...components }}
       >
         {children}
       </ReactMarkdown>

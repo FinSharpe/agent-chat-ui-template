@@ -6,27 +6,27 @@ export const DO_NOT_RENDER_ID_PREFIX = "do-not-render-";
 export function ensureToolCallsHaveResponses(messages: Message[]): Message[] {
   const newMessages: ToolMessage[] = [];
 
-  messages.forEach((message, index) => {
+  const responded = new Set(
+    messages
+      .filter((m): m is ToolMessage => m.type === "tool")
+      .map((m) => m.tool_call_id),
+  );
+  messages.forEach((message) => {
     if (message.type !== "ai" || message.tool_calls?.length === 0) {
       // If it's not an AI message, or it doesn't have tool calls, we can ignore.
       return;
     }
-    // If it has tool calls, ensure the message which follows this is a tool message
-    const followingMessage = messages[index + 1];
-    if (followingMessage && followingMessage.type === "tool") {
-      // Following message is a tool message, so we can ignore.
-      return;
-    }
-
-    // Since the following message is not a tool message, we must create a new tool message
+    // Pair by ID: parallel calls can settle out of order, or only partially.
     newMessages.push(
-      ...(message.tool_calls?.map((tc) => ({
-        type: "tool" as const,
-        tool_call_id: tc.id ?? "",
-        id: `${DO_NOT_RENDER_ID_PREFIX}${uuidv4()}`,
-        name: tc.name,
-        content: "Successfully handled tool call.",
-      })) ?? []),
+      ...(message.tool_calls
+        ?.filter((tc) => tc.id && !responded.has(tc.id))
+        .map((tc) => ({
+          type: "tool" as const,
+          tool_call_id: tc.id ?? "",
+          id: `${DO_NOT_RENDER_ID_PREFIX}${uuidv4()}`,
+          name: tc.name,
+          content: "Tool call interrupted before a response was received.",
+        })) ?? []),
     );
   });
 

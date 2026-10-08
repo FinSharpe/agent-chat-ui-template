@@ -1,146 +1,317 @@
+import { useEffect, useState, type ReactNode } from "react";
+import type { Thread } from "@langchain/langgraph-sdk";
+import { parseAsBoolean, useQueryState } from "nuqs";
+import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useThreads } from "@/providers/Thread";
-import { Thread } from "@langchain/langgraph-sdk";
-import { useEffect } from "react";
-
-import { getContentString } from "../utils";
-import { useQueryState, parseAsBoolean } from "nuqs";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PanelRightOpen, PanelRightClose } from "lucide-react";
+import { useThreads } from "@/providers/Thread";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import {
+  filterThreadHistory,
+  getThreadHistoryGroup,
+  getThreadTitle,
+  THREAD_HISTORY_BATCH_SIZE,
+  THREAD_HISTORY_GROUPS,
+} from "@/lib/thread-history";
+import { cn } from "@/lib/utils";
 
 function ThreadList({
   threads,
-  onThreadClick,
+  query,
+  currentId,
+  onSelect,
 }: {
   threads: Thread[];
-  onThreadClick?: (threadId: string) => void;
+  query: string;
+  currentId: string | null;
+  onSelect: (threadId: string) => void;
 }) {
-  const [threadId, setThreadId] = useQueryState("threadId");
+  const [shown, setShown] = useState(THREAD_HISTORY_BATCH_SIZE);
+  if (threads.length === 0) {
+    return <HistoryNote>Your conversations will appear here.</HistoryNote>;
+  }
+
+  const filtered = filterThreadHistory(threads, query);
+  if (filtered.length === 0) {
+    return <HistoryNote>No chats match your search.</HistoryNote>;
+  }
+  const hasMore = !query.trim() && filtered.length > shown;
+  const visible = hasMore ? filtered.slice(0, shown) : filtered;
+  const now = new Date();
 
   return (
-    <div className="flex h-full w-full flex-col items-start justify-start gap-2 overflow-y-scroll [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent">
-      {threads.map((t) => {
-        let itemText = t.thread_id;
-        if (
-          typeof t.values === "object" &&
-          t.values &&
-          "messages" in t.values &&
-          Array.isArray(t.values.messages) &&
-          t.values.messages?.length > 0
-        ) {
-          const firstMessage = t.values.messages[0];
-          itemText = getContentString(firstMessage.content);
-        }
+    <div className="px-3 pb-3">
+      {THREAD_HISTORY_GROUPS.map((group) => {
+        const rows = visible.filter(
+          (thread) => getThreadHistoryGroup(thread.updated_at, now) === group,
+        );
+        if (!rows.length) return null;
         return (
-          <div
-            key={t.thread_id}
-            className="w-full px-1"
+          <section
+            key={group}
+            aria-label={group}
           >
-            <Button
-              variant="ghost"
-              className="w-[280px] items-start justify-start text-left font-normal"
-              onClick={(e) => {
-                e.preventDefault();
-                onThreadClick?.(t.thread_id);
-                if (t.thread_id === threadId) return;
-                setThreadId(t.thread_id);
-              }}
-            >
-              <p className="truncate text-ellipsis">{itemText}</p>
-            </Button>
-          </div>
+            <h3 className="text-muted-foreground px-2.5 pt-3.5 pb-1.5 text-xs font-semibold tracking-[0.7px] uppercase">
+              {group}
+            </h3>
+            <ul>
+              {rows.map((thread) => {
+                const title = getThreadTitle(thread);
+                const current = thread.thread_id === currentId;
+                return (
+                  <li key={thread.thread_id}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      aria-current={current ? "page" : undefined}
+                      title={title}
+                      className={cn(
+                        "h-auto min-h-12 w-full justify-start rounded-[10px] px-2.5 py-2.5 text-left text-sm font-medium",
+                        current &&
+                          "bg-secondary text-primary hover:bg-secondary hover:text-primary",
+                      )}
+                      onClick={() => onSelect(thread.thread_id)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{title}</span>
+                      {thread.status === "busy" && (
+                        <span
+                          role="status"
+                          className="bg-primary size-1.5 shrink-0 rounded-full motion-safe:animate-pulse"
+                        >
+                          <span className="sr-only">Answer in progress</span>
+                        </span>
+                      )}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         );
       })}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-9 rounded-full px-4 text-xs font-medium"
+            onClick={() =>
+              setShown((count) => count + THREAD_HISTORY_BATCH_SIZE)
+            }
+          >
+            Show more
+          </Button>
+        </div>
+      )}
     </div>
+  );
+}
+
+function HistoryNote({ children }: { children: ReactNode }) {
+  return (
+    <p
+      className="text-muted-foreground p-5 text-xs leading-[1.45]"
+      role="status"
+    >
+      {children}
+    </p>
   );
 }
 
 function ThreadHistoryLoading() {
   return (
-    <div className="flex h-full w-full flex-col items-start justify-start gap-2 overflow-y-scroll [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent">
-      {Array.from({ length: 30 }).map((_, i) => (
+    <div
+      className="space-y-2 px-3 py-4"
+      role="status"
+      aria-label="Loading conversations"
+    >
+      <span className="sr-only">Loading conversations…</span>
+      {Array.from({ length: 6 }, (_, index) => (
         <Skeleton
-          key={`skeleton-${i}`}
-          className="h-10 w-[280px]"
+          key={index}
+          className="h-12 w-full rounded-[10px]"
         />
       ))}
     </div>
   );
 }
 
-export default function ThreadHistory() {
+export default function ThreadHistory({
+  onNewChat,
+  onThreadSelect,
+}: {
+  onNewChat?: () => void;
+  onThreadSelect?: (threadId: string) => void;
+}) {
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
+  const [threadId, setThreadId] = useQueryState("threadId");
   const [chatHistoryOpen, setChatHistoryOpen] = useQueryState(
     "chatHistoryOpen",
     parseAsBoolean.withDefault(false),
   );
-
-  const { getThreads, threads, setThreads, threadsLoading, setThreadsLoading } =
+  const [query, setQuery] = useState("");
+  const { refreshThreads, threads, threadsLoading, threadsError } =
     useThreads();
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setThreadsLoading(true);
-    getThreads()
-      .then(setThreads)
-      .catch(console.error)
-      .finally(() => setThreadsLoading(false));
-  }, []);
+    if (chatHistoryOpen) void refreshThreads();
+  }, [chatHistoryOpen, refreshThreads]);
 
-  return (
+  const closeHistory = () => {
+    setQuery("");
+    void setChatHistoryOpen(false);
+  };
+
+  const header = (
+    <div className="border-muted flex min-h-14 items-center justify-between border-b py-3 pr-3 pl-4">
+      {isLargeScreen ? (
+        <h2 className="text-base leading-[1.35] font-medium">Conversations</h2>
+      ) : (
+        <SheetTitle className="text-base leading-[1.35] font-medium">
+          Conversations
+        </SheetTitle>
+      )}
+      {isLargeScreen && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8 rounded-full"
+          aria-label="Close conversations"
+          onClick={closeHistory}
+        >
+          <X className="size-4" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const body = (
     <>
-      <div className="shadow-inner-right hidden h-screen w-[300px] shrink-0 flex-col items-start justify-start gap-6 border-r-[1px] border-slate-300 lg:flex">
-        <div className="flex w-full items-center justify-between px-4 pt-1.5">
-          <Button
-            className="hover:bg-gray-100"
-            variant="ghost"
-            onClick={() => setChatHistoryOpen((p) => !p)}
-          >
-            {chatHistoryOpen ? (
-              <PanelRightOpen className="size-5" />
-            ) : (
-              <PanelRightClose className="size-5" />
-            )}
-          </Button>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Thread History
-          </h1>
-        </div>
-        {threadsLoading ? (
-          <ThreadHistoryLoading />
-        ) : (
-          <ThreadList threads={threads} />
-        )}
-      </div>
-      <div className="lg:hidden">
-        <Sheet
-          open={!!chatHistoryOpen && !isLargeScreen}
-          onOpenChange={(open) => {
-            if (isLargeScreen) return;
-            setChatHistoryOpen(open);
+      {header}
+      <div className="space-y-2 px-3 pt-3">
+        <Button
+          type="button"
+          className="h-11 w-full rounded-full text-sm font-medium text-white [background:var(--brand-gradient)] hover:opacity-90"
+          onClick={() => {
+            if (onNewChat) onNewChat();
+            else void setThreadId(null);
+            if (!isLargeScreen) closeHistory();
           }}
         >
-          <SheetContent
-            side="left"
-            className="flex lg:hidden"
-          >
-            <SheetHeader>
-              <SheetTitle>Thread History</SheetTitle>
-            </SheetHeader>
-            <ThreadList
-              threads={threads}
-              onThreadClick={() => setChatHistoryOpen((o) => !o)}
-            />
-          </SheetContent>
-        </Sheet>
+          <Plus className="size-4" />
+          New chat
+        </Button>
+        <div className="bg-accent border-border focus-within:border-primary focus-within:ring-primary/20 flex h-11 items-center gap-2 rounded-full border px-3 focus-within:ring-2">
+          <Search
+            className="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+          <input
+            aria-label="Search chats"
+            type="search"
+            placeholder="Search chats"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
+          />
+        </div>
       </div>
+      <div
+        className="mt-2 h-0.5 shrink-0 overflow-hidden"
+        aria-hidden="true"
+      >
+        {threadsLoading && threads.length > 0 && (
+          <div className="bg-primary/40 h-full w-full motion-safe:animate-pulse" />
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {threadsError && threads.length > 0 && (
+          <div
+            className="text-muted-foreground flex items-center gap-2 px-5 py-2 text-xs"
+            role="status"
+          >
+            <span className="flex-1">Could not refresh your chats.</span>
+            <Button
+              variant="link"
+              className="h-8 px-0 text-xs"
+              disabled={threadsLoading}
+              onClick={() => void refreshThreads()}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+        {threadsLoading && threads.length === 0 ? (
+          <ThreadHistoryLoading />
+        ) : threadsError && threads.length === 0 ? (
+          <div
+            className="p-5 text-xs leading-[1.45]"
+            role="alert"
+          >
+            <p className="text-muted-foreground">Could not load your chats.</p>
+            <Button
+              variant="link"
+              className="mt-1 h-9 px-0 text-xs"
+              onClick={() => void refreshThreads()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <ThreadList
+            key={String(chatHistoryOpen)}
+            threads={threads}
+            query={query}
+            currentId={threadId}
+            onSelect={(id) => {
+              if (id !== threadId) {
+                if (onThreadSelect) onThreadSelect(id);
+                else void setThreadId(id);
+              }
+              if (!isLargeScreen) closeHistory();
+            }}
+          />
+        )}
+      </div>
+      {threadsLoading && threads.length > 0 && (
+        <span
+          className="sr-only"
+          role="status"
+        >
+          Refreshing conversations…
+        </span>
+      )}
     </>
+  );
+
+  if (isLargeScreen) {
+    return (
+      <aside
+        aria-label="Conversation history"
+        className="bg-background border-border flex h-dvh w-[290px] shrink-0 flex-col border-r"
+      >
+        {body}
+      </aside>
+    );
+  }
+
+  return (
+    <Sheet
+      open={chatHistoryOpen}
+      onOpenChange={(open) => {
+        if (open) void setChatHistoryOpen(true);
+        else closeHistory();
+      }}
+    >
+      <SheetContent
+        side="left"
+        aria-describedby={undefined}
+        className="w-[min(82vw,290px)] gap-0 sm:max-w-[290px] [&>button:last-child]:top-3 [&>button:last-child]:right-3 [&>button:last-child]:flex [&>button:last-child]:size-8 [&>button:last-child]:items-center [&>button:last-child]:justify-center [&>button:last-child]:rounded-full"
+      >
+        {body}
+      </SheetContent>
+    </Sheet>
   );
 }

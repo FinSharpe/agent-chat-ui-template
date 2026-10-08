@@ -52,7 +52,8 @@ describe("<ModelSwitcher />", () => {
         "Haiku 4.5",
       ]),
     );
-    expect(optionLabels).toHaveLength(Object.keys(PlannerModels).length);
+    expect(optionLabels).toHaveLength(Object.keys(PlannerModels).length + 1);
+    expect(optionLabels[0]).toBe("Auto");
   });
 
   it("fires onValueChange with the provider:model enum string when a user picks an option", async () => {

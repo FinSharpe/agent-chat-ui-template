@@ -8,7 +8,7 @@ import { ModelSwitcher } from "./ModelSwitcher";
 const STORAGE_KEY = "lg:chat:selectedModel";
 
 /**
- * Exercises the full wiring Thread uses: a localStorage-backed state hook
+ * Exercises the retained legacy picker integration: a localStorage-backed hook
  * feeding ModelSwitcher, plus a mock submitter that reads the selected model
  * off the stream.submit `config.configurable.tradekit_agent_model` payload.
  */
@@ -29,7 +29,11 @@ function Harness({
     <div>
       <ModelSwitcher
         value={selectedModel}
-        onValueChange={setSelectedModel}
+        onValueChange={(value) => {
+          if ((Object.values(PlannerModels) as string[]).includes(value)) {
+            setSelectedModel(value as PlannerModels);
+          }
+        }}
       />
       <button
         type="button"

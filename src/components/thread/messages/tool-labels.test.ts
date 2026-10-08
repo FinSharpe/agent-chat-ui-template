@@ -4,13 +4,12 @@ import { formatToolName } from "./tool-labels";
 describe("formatToolName", () => {
   it("returns the curated label for known tool names", () => {
     expect(formatToolName("search_endpoints")).toBe(
-      "Searching for relevant data points",
+      "Find relevant data sources",
     );
-    expect(formatToolName("call_api")).toBe("Gathering financial data");
-    expect(formatToolName("get_endpoint_spec")).toBe(
-      "Reviewing available data options",
-    );
-    expect(formatToolName("scan")).toBe("Scanning the market");
+    expect(formatToolName("call_api")).toBe("Gather financial data");
+    expect(formatToolName("get_endpoint_spec")).toBe("Review available data");
+    expect(formatToolName("scan")).toBe("Scan the market");
+    expect(formatToolName("scan", true)).toBe("Scanning the market");
   });
 
   it("falls back to Title Case for unknown tool names", () => {
@@ -28,8 +27,10 @@ describe("formatToolName", () => {
     expect(formatToolName("by_example")).toBe("By Example");
   });
 
-  it("returns the raw name when input is empty or whitespace", () => {
-    expect(formatToolName("")).toBe("");
-    expect(formatToolName("   ")).toBe("   ");
+  it("provides readable unknown report and instrument names", () => {
+    expect(formatToolName("render_etf_report")).toBe("Build the ETF report");
+    expect(formatToolName("mf_portfolio_export")).toBe("MF Portfolio Export");
+    expect(formatToolName("   ")).toBe("Retrieve data");
+    expect(formatToolName("", true)).toBe("Retrieving data");
   });
 });

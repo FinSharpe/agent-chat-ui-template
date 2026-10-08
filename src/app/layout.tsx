@@ -1,18 +1,22 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import React from "react";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: [
+    { path: "./fonts/Inter-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/Inter-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/Inter-SemiBold.ttf", weight: "600", style: "normal" },
+  ],
   preload: true,
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "Agent Chat",
-  description: "Agent Chat UX by LangChain",
+  description: "Conversations, research, and reports with your agent.",
 };
 
 export default function RootLayout({

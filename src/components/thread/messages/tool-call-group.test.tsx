@@ -32,14 +32,15 @@ describe("<ToolCallGroup />", () => {
     expect(screen.getByText("Running")).toBeInTheDocument();
   });
 
-  it("renders a Done status when a successful response is present", () => {
+  it("uses the resting friendly label and accessible completion without a status pill", () => {
     render(
       <ToolCallGroup
         toolCall={baseCall}
         response={makeResponse('{"ok": true}')}
       />,
     );
-    expect(screen.getByText("Done")).toBeInTheDocument();
+    expect(screen.getByText("Scan the market")).toBeInTheDocument();
+    expect(screen.getByText("Completed")).toHaveClass("sr-only");
   });
 
   it("renders an Error status when response.status is error", () => {
@@ -49,7 +50,7 @@ describe("<ToolCallGroup />", () => {
         response={makeResponse("boom", "error")}
       />,
     );
-    expect(screen.getByText("Error")).toBeInTheDocument();
+    expect(screen.getByText("Scan the market · failed")).toBeInTheDocument();
   });
 
   it("body is collapsed by default and reveals arguments + response on click", async () => {
@@ -61,12 +62,12 @@ describe("<ToolCallGroup />", () => {
       />,
     );
 
-    expect(screen.queryByText("Arguments")).not.toBeInTheDocument();
+    expect(screen.queryByText("Request parameters")).not.toBeInTheDocument();
     expect(screen.queryByText("Response")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /expand tool call/i }));
 
-    expect(screen.getByText("Arguments")).toBeInTheDocument();
+    expect(screen.getByText("Request parameters")).toBeInTheDocument();
     expect(screen.getByText("Response")).toBeInTheDocument();
     // Parsed response key visible (JsonViewer default-expands root)
     expect(screen.getByText('"hits"')).toBeInTheDocument();
@@ -99,13 +100,13 @@ describe("<ToolCallGroup />", () => {
     expect(screen.getByText(/just a plain error message/)).toBeInTheDocument();
   });
 
-  it("does not render a Response section while the tool is still running", async () => {
+  it("shows an explicit pending response while the tool is still running", async () => {
     const user = userEvent.setup();
     render(<ToolCallGroup toolCall={baseCall} />);
     await user.click(screen.getByRole("button", { name: /expand/i }));
 
-    expect(screen.getByText("Arguments")).toBeInTheDocument();
-    expect(screen.queryByText("Response")).not.toBeInTheDocument();
+    expect(screen.getByText("Request parameters")).toBeInTheDocument();
+    expect(screen.getByText("No response yet.")).toBeInTheDocument();
   });
 
   it("renders an empty-args placeholder when there are no arguments", async () => {

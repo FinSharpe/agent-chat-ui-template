@@ -1,0 +1,48 @@
+@property --tool-crest-position {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 200%;
+}
+
+.tool-motion-clock {
+  animation: tool-crest-clock 2.8s linear infinite;
+}
+
+/* A transcript supplies one clock to every local group. Standalone groups
+   retain their own clock without restarting it when a disclosure opens. */
+.tool-motion-clock .tool-motion-clock {
+  animation: none;
+}
+
+.tool-crest {
+  color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    var(--muted-foreground) 40%,
+    var(--primary) 49%,
+    var(--muted-foreground) 58%
+  );
+  background-size: 250% 100%;
+  background-position: var(--tool-crest-position) 0;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+@keyframes tool-crest-clock {
+  from {
+    --tool-crest-position: 200%;
+  }
+  to {
+    --tool-crest-position: -150%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-motion-clock {
+    animation: none;
+  }
+  .tool-crest {
+    color: var(--muted-foreground);
+    background: none;
+  }
+}
