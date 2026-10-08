@@ -13,6 +13,10 @@ import {
 } from "react";
 import { Decision, DecisionWithEdits, HITLRequest, SubmitType } from "../types";
 import { buildDecisionFromState, createDefaultHumanResponse } from "../utils";
+import {
+  createInterruptResume,
+  pendingInterrupts,
+} from "@/lib/agent-inbox-interrupt";
 
 interface UseInterruptedActionsInput {
   interrupt: Interrupt<HITLRequest>;
@@ -90,9 +94,11 @@ export default function useInterruptedActions({
         {},
         {
           command: {
-            resume: {
+            resume: createInterruptResume(
+              interrupt,
               decisions,
-            },
+              pendingInterrupts(thread),
+            ),
           },
         },
       );

@@ -39,14 +39,10 @@ function renderInterruptStateItem(value: any): React.ReactNode {
   }
 }
 
-export function GenericInterruptView({
-  interrupt,
-}: {
-  interrupt: Record<string, any> | Record<string, any>[];
-}) {
+export function GenericInterruptView({ interrupt }: { interrupt: unknown }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const contentStr = JSON.stringify(interrupt, null, 2);
+  const contentStr = JSON.stringify(interrupt, null, 2) ?? String(interrupt);
   const contentLines = contentStr.split("\n");
   const shouldTruncate = contentLines.length > 4 || contentStr.length > 500;
 
@@ -80,7 +76,10 @@ export function GenericInterruptView({
     if (Array.isArray(interrupt)) {
       return isExpanded ? interrupt : interrupt.slice(0, 5);
     } else {
-      const entries = Object.entries(interrupt);
+      const entries =
+        interrupt && typeof interrupt === "object"
+          ? Object.entries(interrupt)
+          : [["Value", interrupt]];
       if (!isExpanded && shouldTruncate) {
         // When collapsed, process each value to potentially truncate it
         return entries.map(([key, value]) => [key, truncateValue(value)]);

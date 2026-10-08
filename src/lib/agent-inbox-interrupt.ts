@@ -1,10 +1,41 @@
-import { Interrupt } from "@langchain/langgraph-sdk";
-import { HITLRequest } from "@/components/thread/agent-inbox/types";
+import type { Interrupt } from "@langchain/langgraph-sdk";
+import type {
+  Decision,
+  HITLRequest,
+} from "@/components/thread/agent-inbox/types";
+
+export function pendingInterrupts(stream: {
+  interrupt?: unknown;
+  interrupts?: readonly unknown[];
+}): readonly unknown[] {
+  if (stream.interrupts?.length) return stream.interrupts;
+  if (Array.isArray(stream.interrupt)) return stream.interrupt;
+  return stream.interrupt == null ? [] : [stream.interrupt];
+}
+
+/** Scalar resumes the next interrupt; a pending fan-out must target its ID. */
+export function createInterruptResume(
+  interrupt: Pick<Interrupt, "id">,
+  decisions: Decision[],
+  pending: readonly unknown[],
+): { decisions: Decision[] } | Record<string, { decisions: Decision[] }> {
+  const response = { decisions };
+  if (pending.length <= 1) return response;
+  if (!interrupt.id)
+    throw new Error(
+      "An interrupt ID is required when more than one approval is pending.",
+    );
+  return { [interrupt.id]: response };
+}
 
 export function isAgentInboxInterruptSchema(
   value: unknown,
 ): value is Interrupt<HITLRequest> | Interrupt<HITLRequest>[] {
-  const valueAsObject = Array.isArray(value) ? value[0] : value;
+  const interrupts = Array.isArray(value) ? value : [value];
+  return interrupts.length > 0 && interrupts.every(isHitlInterrupt);
+}
+
+function isHitlInterrupt(valueAsObject: unknown): boolean {
   if (!valueAsObject || typeof valueAsObject !== "object") {
     return false;
   }

@@ -10,6 +10,10 @@ import { useQueryState } from "nuqs";
 import { constructOpenInStudioURL, buildDecisionFromState } from "../utils";
 import { Decision, HITLRequest, DecisionType, ActionRequest } from "../types";
 import { useStreamContext } from "@/providers/Stream";
+import {
+  createInterruptResume,
+  pendingInterrupts,
+} from "@/lib/agent-inbox-interrupt";
 
 interface ThreadActionsViewProps {
   interrupt: Interrupt<HITLRequest>;
@@ -179,7 +183,11 @@ export function ThreadActionsView({
         {},
         {
           command: {
-            resume: { decisions: allDecisions },
+            resume: createInterruptResume(
+              interrupt,
+              allDecisions,
+              pendingInterrupts(stream),
+            ),
           },
         },
       );
@@ -197,7 +205,7 @@ export function ThreadActionsView({
         duration: 5000,
       });
     }
-  }, [actionRequests, hasMultipleActions, stream]);
+  }, [actionRequests, hasMultipleActions, stream, interrupt]);
 
   const handleSubmitAll = useCallback(() => {
     if (!hasMultipleActions) return;
@@ -226,7 +234,11 @@ export function ThreadActionsView({
         {},
         {
           command: {
-            resume: { decisions: allDecisions },
+            resume: createInterruptResume(
+              interrupt,
+              allDecisions,
+              pendingInterrupts(stream),
+            ),
           },
         },
       );
@@ -247,7 +259,7 @@ export function ThreadActionsView({
     } finally {
       setSubmittingAll(false);
     }
-  }, [actionRequests, addressedActions, hasMultipleActions, stream]);
+  }, [actionRequests, addressedActions, hasMultipleActions, stream, interrupt]);
 
   const allAllowApprove = useMemo(() => {
     if (!hasMultipleActions) return false;

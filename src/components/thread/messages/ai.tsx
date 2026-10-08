@@ -9,7 +9,10 @@ import { cn } from "@/lib/utils";
 import { ToolCalls, ToolResult } from "./tool-calls";
 import { Fragment } from "react/jsx-runtime";
 import { useMemo } from "react";
-import { isAgentInboxInterruptSchema } from "@/lib/agent-inbox-interrupt";
+import {
+  isAgentInboxInterruptSchema,
+  pendingInterrupts,
+} from "@/lib/agent-inbox-interrupt";
 import { ThreadView } from "../agent-inbox";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { GenericInterruptView } from "./generic-interrupt";
@@ -57,22 +60,31 @@ function Interrupt({
   isLastMessage,
   hasNoAIOrToolMessages,
 }: InterruptProps) {
-  const fallbackValue = Array.isArray(interrupt)
-    ? (interrupt as Record<string, any>[])
-    : (((interrupt as { value?: unknown } | undefined)?.value ??
-        interrupt) as Record<string, any>);
+  if (!interrupt || !(isLastMessage || hasNoAIOrToolMessages)) return null;
+  const pending = Array.isArray(interrupt) ? interrupt : [interrupt];
+  // Modern HITL controls consume SDK envelopes, including their IDs. Generic
+  // interruptions show values; a mixed fan-out must not hide either kind.
+  const inbox = pending.flatMap((item) =>
+    isAgentInboxInterruptSchema(item)
+      ? Array.isArray(item)
+        ? item
+        : [item]
+      : [],
+  );
+  const generic = pending
+    .filter((item) => !isAgentInboxInterruptSchema(item))
+    .map((item) =>
+      item && typeof item === "object" && "value" in item ? item.value : item,
+    );
 
   return (
     <>
-      {isAgentInboxInterruptSchema(interrupt) &&
-        (isLastMessage || hasNoAIOrToolMessages) && (
-          <ThreadView interrupt={interrupt} />
-        )}
-      {interrupt &&
-      !isAgentInboxInterruptSchema(interrupt) &&
-      (isLastMessage || hasNoAIOrToolMessages) ? (
-        <GenericInterruptView interrupt={fallbackValue} />
-      ) : null}
+      {inbox.length > 0 && <ThreadView interrupt={inbox} />}
+      {generic.length > 0 && (
+        <GenericInterruptView
+          interrupt={generic.length === 1 ? generic[0] : generic}
+        />
+      )}
     </>
   );
 }
@@ -109,7 +121,8 @@ export function AssistantMessage({
     (m) => m.type === "ai" || m.type === "tool",
   );
   const meta = message ? thread.getMessagesMetadata(message) : undefined;
-  const threadInterrupt = thread.interrupt;
+  // The installed SDK's singular getter is only the first pending interrupt.
+  const threadInterrupt = pendingInterrupts(thread);
 
   const parentCheckpoint = meta?.firstSeenState?.parent_checkpoint;
   const toolCalls = message ? getToolCalls(message) : [];
