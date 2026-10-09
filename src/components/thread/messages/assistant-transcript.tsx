@@ -10,6 +10,7 @@ import { ToolDisclosureProvider } from "./disclosure-state";
 import { projectConversation } from "./tool-activity";
 import { CitationTurn } from "./citations-view";
 import type { ToolPhase } from "./tool-call-group";
+import { getContentString } from "../utils";
 
 export function conversationTurns(messages: Message[]): Message[][] {
   const turns: Message[][] = [];
@@ -81,6 +82,14 @@ export function AssistantTranscript({
             customMessageIds.has(message.id) ||
             (!!stream.interrupt && message === visible[visible.length - 1]),
         );
+        // A report or tool-only message can follow the final prose. Actions
+        // belong to that answer once the turn settles, without empty rows
+        // beneath its intermediate messages.
+        const lastAnswer = turn.findLast(
+          (message) =>
+            message.type === "ai" &&
+            getContentString(message.content).trim().length > 0,
+        );
         const activeCall =
           phase === "running"
             ? parts
@@ -126,6 +135,9 @@ export function AssistantTranscript({
                     isLoading={isLoading}
                     handleRegenerate={handleRegenerate}
                     includeToolCalls={false}
+                    showActions={
+                      part.message === lastAnswer && (!current || !isLoading)
+                    }
                   />
                 ),
               )}

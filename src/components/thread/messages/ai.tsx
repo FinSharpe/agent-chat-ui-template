@@ -94,6 +94,7 @@ export function AssistantMessage({
   isLoading,
   handleRegenerate,
   includeToolCalls = true,
+  showActions = true,
 }: {
   message: Message | undefined;
   isLoading: boolean;
@@ -102,6 +103,7 @@ export function AssistantMessage({
     message?: Message,
   ) => void;
   includeToolCalls?: boolean;
+  showActions?: boolean;
 }) {
   const content = message?.content ?? [];
   // Tool payloads are opaque JSON values, including arrays, false and null.
@@ -139,6 +141,8 @@ export function AssistantMessage({
 
   const isToolResult = message?.type === "tool";
   const mcpApp = message ? getMcpApp(message) : undefined;
+  const hasBranches = !!meta?.branch && (meta.branchOptions?.length ?? 0) > 1;
+  const showCommands = showActions && contentString.trim().length > 0;
 
   return (
     <div className="group mr-auto flex w-full items-start gap-2">
@@ -202,28 +206,31 @@ export function AssistantMessage({
               isLastMessage={isLastMessage}
               hasNoAIOrToolMessages={hasNoAIOrToolMessages}
             />
-            {(contentString.length > 0 ||
-              (meta?.branchOptions?.length ?? 0) > 1) && (
+            {(showCommands || hasBranches) && (
               <div
                 className={cn(
                   "message-actions mr-auto flex items-center gap-2 transition-opacity",
                   "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
                 )}
               >
-                <BranchSwitcher
-                  branch={meta?.branch}
-                  branchOptions={meta?.branchOptions}
-                  onSelect={(branch) => thread.setBranch(branch)}
-                  isLoading={isLoading}
-                />
-                <CommandBar
-                  content={contentString}
-                  isLoading={isLoading}
-                  isAiMessage={true}
-                  handleRegenerate={() =>
-                    handleRegenerate(parentCheckpoint, message)
-                  }
-                />
+                {hasBranches && (
+                  <BranchSwitcher
+                    branch={meta?.branch}
+                    branchOptions={meta?.branchOptions}
+                    onSelect={(branch) => thread.setBranch(branch)}
+                    isLoading={isLoading}
+                  />
+                )}
+                {showCommands && (
+                  <CommandBar
+                    content={contentString}
+                    isLoading={isLoading}
+                    isAiMessage={true}
+                    handleRegenerate={() =>
+                      handleRegenerate(parentCheckpoint, message)
+                    }
+                  />
+                )}
               </div>
             )}
           </>
