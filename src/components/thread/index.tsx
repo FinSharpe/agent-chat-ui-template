@@ -413,6 +413,12 @@ export function Thread() {
                 onRemove={removeBlock}
               />
               <div className="flex min-h-12 items-center gap-1 pr-1 pl-2">
+                <ModelSwitcher
+                  value={models.value}
+                  onValueChange={models.select}
+                  options={models.options}
+                  disabled={isLoading || stream.isThreadLoading}
+                />
                 <TooltipIconButton
                   type="button"
                   tooltip="Upload PDF or image"
@@ -480,18 +486,9 @@ export function Thread() {
               </div>
             </form>
           </div>
-          <div className="mt-2 flex min-h-9 items-center justify-between gap-2 px-1">
-            <ModelSwitcher
-              value={models.value}
-              onValueChange={models.select}
-              options={models.options}
-              disabled={isLoading || stream.isThreadLoading}
-              className="max-w-[200px] border-transparent bg-transparent"
-            />
-            <span className="text-muted-foreground hidden text-[10px] sm:block">
-              Enter to send · Shift + Enter for a new line
-            </span>
-          </div>
+          <p className="text-muted-foreground mt-2 hidden px-1 text-right text-[10px] sm:block">
+            Enter to send · Shift + Enter for a new line
+          </p>
         </div>
       </main>
       {artifactOpen && isLargeScreen && (

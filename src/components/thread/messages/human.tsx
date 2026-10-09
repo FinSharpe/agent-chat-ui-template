@@ -138,11 +138,16 @@ export function HumanMessage({
   return (
     <div
       className={cn(
-        "group ml-auto flex max-w-[78%] min-w-0 items-center gap-2",
+        "group ml-auto flex w-fit max-w-[78%] min-w-0 flex-col items-end gap-2",
         isEditing && "w-full max-w-xl",
       )}
     >
-      <div className={cn("flex flex-col gap-2", isEditing && "w-full")}>
+      <div
+        className={cn(
+          "flex max-w-full min-w-0 flex-col items-end gap-2",
+          isEditing && "w-full",
+        )}
+      >
         {isEditing ? (
           <EditableContent
             value={value}
@@ -150,10 +155,10 @@ export function HumanMessage({
             onSubmit={handleSubmitEdit}
           />
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex max-w-full min-w-0 flex-col items-end gap-2">
             {/* Render images and files if no text */}
             {Array.isArray(message.content) && message.content.length > 0 && (
-              <div className="flex flex-wrap items-end justify-end gap-2">
+              <div className="flex max-w-full flex-wrap items-end justify-end gap-2">
                 {message.content.reduce<React.ReactNode[]>(
                   (acc, block, idx) => {
                     if (isBase64ContentBlock(block)) {
@@ -162,6 +167,7 @@ export function HumanMessage({
                           key={idx}
                           block={block}
                           size="md"
+                          className="max-w-full"
                         />,
                       );
                     }
@@ -173,7 +179,7 @@ export function HumanMessage({
             )}
             {/* Render text if present, otherwise fallback to file/image name */}
             {contentString ? (
-              <div className="bg-secondary text-secondary-foreground ml-auto w-fit min-w-12 rounded-[14px] rounded-tr-[2px] p-3.5 text-left text-[13px] leading-normal font-medium">
+              <div className="bg-secondary text-secondary-foreground ml-auto w-fit max-w-full min-w-12 rounded-[14px] rounded-tr-[2px] p-3.5 text-left text-[13px] leading-normal font-medium">
                 <CollapsibleText>{contentString}</CollapsibleText>
               </div>
             ) : null}
@@ -182,7 +188,7 @@ export function HumanMessage({
 
         <div
           className={cn(
-            "message-actions ml-auto flex items-center gap-2 transition-opacity",
+            "message-actions ml-auto flex max-w-full flex-wrap items-center justify-end gap-2 transition-opacity",
             "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100",
             isEditing && "opacity-100",
           )}

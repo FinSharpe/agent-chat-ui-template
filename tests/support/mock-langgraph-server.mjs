@@ -213,6 +213,21 @@ older.values.messages = [
 checkpoint(older);
 older.updated_at = new Date(Date.now() - 12 * 86400000).toISOString();
 
+const tableSample = makeThread(
+  "44444444-4444-4444-8444-444444444444",
+  "News table layout sample",
+);
+tableSample.values.messages = [
+  { id: "table-human", type: "human", content: "Analyse Tata Motors" },
+  {
+    id: "table-answer",
+    type: "ai",
+    content:
+      "## Recent headlines\n\nSynthetic examples for checking table layout.\n\n| Date | Headline | Sentiment |\n| --- | --- | --- |\n| Oct 9 | Sample auto shares fall despite record sales and a tax reduction | Neutral |\n| Oct 8 | Sample Company share price targets ahead of the quarterly results | Positive |\n| Oct 7 | Auto stocks decline as investors reconsider the timing of rate cuts | Negative |\n| Oct 6 | Sample Company asks suppliers to increase production capacity next year | Positive |\n| Oct 6 | Sample Company vehicle sales rise as demand improves across markets | Positive |\n| Oct 6 | How a sample company demerger unlocked value for investors | Neutral |",
+  },
+];
+checkpoint(tableSample);
+
 function json(response, value, status = 200) {
   response.writeHead(status, { "Content-Type": "application/json" });
   response.end(JSON.stringify(value));

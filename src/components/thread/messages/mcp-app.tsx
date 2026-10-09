@@ -233,12 +233,22 @@ export function McpAppReport({ app }: { app: McpApp }) {
   return (
     <section
       aria-label={title}
-      className="bg-background/70 my-1 min-w-0 overflow-hidden rounded-xl border"
+      className="my-1 min-w-0"
     >
-      <div className="text-muted-foreground flex items-center justify-between gap-2 border-b px-3 py-2 text-[11px]">
-        <span className="text-foreground font-medium">{title}</span>
-        {!ready && !failed && <span role="status">Opening report…</span>}
-        {failed && (
+      {!ready && !failed && (
+        <p
+          role="status"
+          className="text-muted-foreground py-2 text-xs"
+        >
+          Opening report…
+        </p>
+      )}
+      {failed && (
+        <div className="text-muted-foreground flex flex-wrap items-center gap-2 py-2 text-xs">
+          <p role="alert">
+            The report did not open. You can reload it; the conversation is
+            saved.
+          </p>
           <button
             type="button"
             className="text-primary underline underline-offset-2"
@@ -250,15 +260,7 @@ export function McpAppReport({ app }: { app: McpApp }) {
           >
             Reload report
           </button>
-        )}
-      </div>
-      {failed && (
-        <p
-          role="alert"
-          className="text-muted-foreground px-3 py-2 text-xs"
-        >
-          The report did not open. You can reload it; the conversation is saved.
-        </p>
+        </div>
       )}
       {html !== undefined && (
         <iframe

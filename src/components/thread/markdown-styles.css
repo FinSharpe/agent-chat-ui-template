@@ -37,13 +37,38 @@
 
 .markdown-content table {
   border-collapse: collapse;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  table-layout: auto;
 }
 
 .markdown-content th,
 .markdown-content td {
   border-color: var(--border);
   padding: 8px;
+  overflow-wrap: normal;
+  word-break: normal;
+  vertical-align: top;
+}
+
+.markdown-content .markdown-table-cell {
+  display: block;
+  max-width: 64ch;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.markdown-content .markdown-table-cell-compact {
+  max-width: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .markdown-content .markdown-table-cell:not(.markdown-table-cell-compact) {
+    max-width: 24ch;
+  }
 }
 
 .markdown-content th {

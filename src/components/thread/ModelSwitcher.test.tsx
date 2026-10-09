@@ -5,6 +5,35 @@ import { ModelSwitcher } from "./ModelSwitcher";
 import { PlannerModels } from "@/configs/models";
 
 describe("<ModelSwitcher />", () => {
+  it("uses the catalog's short label in the composer and full label in the menu", async () => {
+    const user = userEvent.setup();
+    render(
+      <ModelSwitcher
+        value="example:model"
+        onValueChange={() => {}}
+        options={[
+          {
+            id: "example:model",
+            label: "Example reasoning model",
+            shortLabel: "Reasoning",
+            provider: "Example",
+            available: true,
+            supportsImages: true,
+          },
+        ]}
+      />,
+    );
+    const trigger = screen.getByRole("combobox", { name: /select model/i });
+    expect(trigger).toHaveTextContent("Reasoning");
+    expect(trigger).toHaveAttribute("title", "Example reasoning model");
+    await user.click(trigger);
+    expect(
+      within(await screen.findByRole("listbox")).getByRole("option", {
+        name: "Example reasoning model",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders the currently-selected model's display name", () => {
     render(
       <ModelSwitcher

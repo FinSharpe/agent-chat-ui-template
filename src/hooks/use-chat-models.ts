@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   AUTO_MODEL,
   type ChatModelOption,
@@ -20,6 +27,9 @@ const emptyPrefs = (): ChatModelPrefs => ({
 });
 type StoredPrefs = { prefs: ChatModelPrefs; migrateLegacy?: string };
 type Catalog = { options: ChatModelOption[]; fresh: boolean };
+const subscribeToHydration = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
 
 function readPrefs(scope: string): StoredPrefs {
   if (!scope || typeof window === "undefined") return { prefs: emptyPrefs() };
@@ -63,17 +73,29 @@ export function useChatModels(
   threadId: string | null,
   requestApi: (path: string, init?: RequestInit) => Promise<Response>,
 ) {
+  // The prerender and first hydration pass must use the same fallback. A
+  // client-only mount can still read saved choices immediately.
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    clientSnapshot,
+    serverSnapshot,
+  );
   // A dynamic localStorage key cannot reuse another deployment's state.
   const [scopedPrefs, setScopedPrefs] = useState<Record<string, StoredPrefs>>(
-    () => ({ [apiUrl]: readPrefs(apiUrl) }),
+    {},
   );
   const stored = useMemo(
-    () => scopedPrefs[apiUrl] ?? readPrefs(apiUrl),
-    [apiUrl, scopedPrefs],
+    () =>
+      scopedPrefs[apiUrl] ??
+      (hydrated ? readPrefs(apiUrl) : { prefs: emptyPrefs() }),
+    [apiUrl, scopedPrefs, hydrated],
   );
   const prefs = stored.prefs;
   const [catalogs, setCatalogs] = useState<Record<string, Catalog>>({});
-  const cachedCatalog = useMemo(() => readCatalog(apiUrl), [apiUrl]);
+  const cachedCatalog = useMemo(
+    () => (hydrated ? readCatalog(apiUrl) : undefined),
+    [apiUrl, hydrated],
+  );
   const catalog = catalogs[apiUrl] ?? cachedCatalog;
   const offered = catalog?.options ?? legacyModels;
   const pendingNewChat = useRef<{ scope: string; model: string } | null>(null);
@@ -116,7 +138,7 @@ export function useChatModels(
   );
 
   useEffect(() => {
-    if (!apiUrl) return;
+    if (!apiUrl || !hydrated) return;
     try {
       window.localStorage.setItem(prefsKey(apiUrl), JSON.stringify(prefs));
       // Consume the unscoped preference only after its scoped copy is safe.
@@ -128,9 +150,10 @@ export function useChatModels(
     } catch {
       /* Selection still works when persistence is unavailable. */
     }
-  }, [apiUrl, prefs, stored.migrateLegacy]);
+  }, [apiUrl, prefs, stored.migrateLegacy, hydrated]);
 
   useEffect(() => {
+    if (!hydrated) return;
     const controller = new AbortController();
     requestApi("/api/models", { signal: controller.signal })
       .then(async (response) => {
@@ -155,7 +178,7 @@ export function useChatModels(
         /* Generic LangGraph deployments keep their existing catalog. */
       });
     return () => controller.abort();
-  }, [apiUrl, requestApi, updatePrefs]);
+  }, [apiUrl, requestApi, updatePrefs, hydrated]);
 
   useEffect(() => {
     // Browser navigation is a choice of an existing conversation, rather than

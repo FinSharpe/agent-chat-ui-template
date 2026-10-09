@@ -6,7 +6,15 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
-import { FC, memo, useState } from "react";
+import {
+  Children,
+  type ComponentPropsWithoutRef,
+  FC,
+  isValidElement,
+  memo,
+  type ReactNode,
+  useState,
+} from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { SyntaxHighlighter } from "@/components/thread/syntax-highlighter";
 
@@ -59,6 +67,51 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
     </div>
   );
 };
+
+function cellText(children: ReactNode): string {
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number")
+        return String(child);
+      return isValidElement<{ children?: ReactNode }>(child)
+        ? cellText(child.props.children)
+        : "";
+    })
+    .join("");
+}
+
+function MarkdownTableCell({
+  header = false,
+  className,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<"td"> & { header?: boolean; node?: unknown }) {
+  // react-markdown supplies the AST node for renderer use, not as a DOM attribute.
+  delete props.node;
+  const text = cellText(children).trim();
+  const compact =
+    text.length <= 32 && !text.includes("\n") && text.split(/\s+/u).length <= 4;
+  const Cell = header ? "th" : "td";
+  return (
+    <Cell
+      className={cn(
+        header ? "bg-muted font-semibold" : "border-b",
+        "px-3 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right",
+        className,
+      )}
+      {...props}
+    >
+      <span
+        className={cn(
+          "markdown-table-cell",
+          compact && "markdown-table-cell-compact",
+        )}
+      >
+        {children}
+      </span>
+    </Cell>
+  );
+}
 
 const defaultComponents: any = {
   h1: ({ className, ...props }: { className?: string }) => (
@@ -162,35 +215,24 @@ const defaultComponents: any = {
   ),
   table: ({ className, ...props }: { className?: string }) => (
     <div
-      className="my-3 max-w-full overflow-x-auto rounded-lg border"
+      className="my-3 max-w-full min-w-0 overflow-x-auto overscroll-x-contain rounded-lg border"
       role="region"
       aria-label="Data table"
       tabIndex={0}
     >
       <table
-        className={cn("w-full border-collapse text-xs tabular-nums", className)}
+        className={cn("border-collapse text-xs tabular-nums", className)}
         {...props}
       />
     </div>
   ),
-  th: ({ className, ...props }: { className?: string }) => (
-    <th
-      className={cn(
-        "bg-muted px-3 py-2 text-left font-semibold [&[align=center]]:text-center [&[align=right]]:text-right",
-        className,
-      )}
+  th: (props: ComponentPropsWithoutRef<"td"> & { node?: unknown }) => (
+    <MarkdownTableCell
+      header
       {...props}
     />
   ),
-  td: ({ className, ...props }: { className?: string }) => (
-    <td
-      className={cn(
-        "border-b px-3 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  td: MarkdownTableCell,
   tr: ({ className, ...props }: { className?: string }) => (
     <tr
       className={cn("m-0 p-0 last:[&>td]:border-b-0", className)}

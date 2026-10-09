@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
+import { hydrateRoot, type Root } from "react-dom/client";
 import { PlannerModels } from "@/configs/models";
 import { AUTO_MODEL } from "@/lib/chat-models";
+import { ModelSwitcher } from "@/components/thread/ModelSwitcher";
 import { useChatModels } from "./use-chat-models";
 
 const API_A = "https://a.example/api";
@@ -25,6 +28,106 @@ function save(
 }
 
 beforeEach(() => localStorage.clear());
+
+describe("model preference hydration", () => {
+  it("hydrates the server fallback without replacing a saved thread pin or cached transport", async () => {
+    save(API_A, "served:vision", {
+      saved: "served:text",
+      explicitAuto: AUTO_MODEL,
+    });
+    const cached = JSON.stringify({ models: catalog });
+    localStorage.setItem(catalogKey(API_A), cached);
+    const request = vi.fn().mockRejectedValue(new Error("offline"));
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    const recoverable = vi.fn();
+    let current: ReturnType<typeof useChatModels> | undefined;
+    function Picker() {
+      current = useChatModels(API_A, "saved", request);
+      return (
+        <ModelSwitcher
+          value={current.value}
+          options={current.options}
+          onValueChange={current.select}
+        />
+      );
+    }
+    const container = document.createElement("div");
+    let root: Root | undefined;
+    try {
+      container.innerHTML = renderToString(<Picker />);
+      expect(container.textContent).toBe("Auto");
+      expect(write).not.toHaveBeenCalled();
+      document.body.append(container);
+      await act(async () => {
+        root = hydrateRoot(container, <Picker />, {
+          onRecoverableError: recoverable,
+        });
+      });
+      await waitFor(() => expect(container.textContent).toBe("Text model"));
+      expect(recoverable).not.toHaveBeenCalled();
+      expect(current!.supportsImages).toBe(false);
+      expect(current!.submissionOptions()).toEqual({
+        context: { model: "served:text", model_switcher_enabled: false },
+      });
+      expect(JSON.parse(localStorage.getItem(prefsKey(API_A))!)).toMatchObject({
+        last: "served:vision",
+        threads: { saved: "served:text", explicitAuto: AUTO_MODEL },
+      });
+      expect(localStorage.getItem(catalogKey(API_A))).toBe(cached);
+      const writes = write.mock.calls.filter(
+        ([key]) => key === prefsKey(API_A),
+      );
+      expect(writes.length).toBeGreaterThan(0);
+      expect(
+        writes.every(([, value]) => JSON.parse(value).last === "served:vision"),
+      ).toBe(true);
+    } finally {
+      if (root) await act(async () => root!.unmount());
+      container.remove();
+      write.mockRestore();
+    }
+  });
+
+  it("migrates a legacy selection only after hydration persists its scoped choice", async () => {
+    const legacy = JSON.stringify(PlannerModels.HAIKU_4_5);
+    localStorage.setItem("lg:chat:selectedModel", legacy);
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    const recoverable = vi.fn();
+    function Picker() {
+      const models = useChatModels(API_A, null, notFound);
+      return <span>{models.value}</span>;
+    }
+    const container = document.createElement("div");
+    let root: Root | undefined;
+    try {
+      container.innerHTML = renderToString(<Picker />);
+      expect(container.textContent).toBe(AUTO_MODEL);
+      expect(localStorage.getItem("lg:chat:selectedModel")).toBe(legacy);
+      document.body.append(container);
+      await act(async () => {
+        root = hydrateRoot(container, <Picker />, {
+          onRecoverableError: recoverable,
+        });
+      });
+      expect(container.textContent).toBe(PlannerModels.HAIKU_4_5);
+      expect(recoverable).not.toHaveBeenCalled();
+      expect(localStorage.getItem("lg:chat:selectedModel")).toBeNull();
+      const writes = write.mock.calls.filter(
+        ([key]) => key === prefsKey(API_A),
+      );
+      expect(writes.length).toBeGreaterThan(0);
+      expect(
+        writes.every(
+          ([, value]) => JSON.parse(value).last === PlannerModels.HAIKU_4_5,
+        ),
+      ).toBe(true);
+    } finally {
+      if (root) await act(async () => root!.unmount());
+      container.remove();
+      write.mockRestore();
+    }
+  });
+});
 
 describe("scoped model preferences", () => {
   it("reads each API's preferences during a scope switch and never overwrites the new scope with old values", () => {
