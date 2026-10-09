@@ -30,7 +30,11 @@ export function wrapGuestHtml(
   theme: "light" | "dark",
   fontCss = "",
 ) {
-  const prefix = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; frame-src 'none'; base-uri 'none'"><meta name="color-scheme" content="${theme}"><script>document.documentElement.setAttribute('data-theme','${theme}');document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('a'))e.preventDefault()},true);</script>${fontCss}`;
+  // Embedded reports use the chat column's gutters, rather than a second
+  // document inset. Only the outer shell changes; cards and tables keep theirs.
+  const layout =
+    "<style data-chat-report-layout>html,body{margin:0!important;padding:0!important}body>.wrap{margin:0!important;padding:0!important}</style>";
+  const prefix = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; frame-src 'none'; base-uri 'none'"><meta name="color-scheme" content="${theme}"><script>document.documentElement.setAttribute('data-theme','${theme}');document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('a'))e.preventDefault()},true);</script>${fontCss}${layout}`;
   const head = /<head(?:\s[^>]*)?>/i.exec(html);
   if (head)
     return (
@@ -233,7 +237,7 @@ export function McpAppReport({ app }: { app: McpApp }) {
   return (
     <section
       aria-label={title}
-      className="my-1 min-w-0"
+      className="min-w-0"
     >
       {!ready && !failed && (
         <p
